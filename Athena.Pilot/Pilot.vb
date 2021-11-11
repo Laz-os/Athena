@@ -28,7 +28,9 @@ Public Module Pilot
             End If
         Next
         '''
+        '!!!! Constrained should be set to TRUE only if we have a PARAMETRIC definition of input parameters ( spanf=f(fus_lenth) )!!!!
         SetDesignVariables(X2, MyProjectRoot.Model, Aero, False)
+        '''
         If Constrained Then
             Check_ACC_Constrains(score, MyProjectRoot.Model)
             If score < 0 Then
@@ -60,12 +62,17 @@ Public Module Pilot
 #End Region
         Dim Mission As New Performance.Mission
         Dim Properties As New Performance.Mission.MissionProperties
-        Mission.Initialize(Properties, Alt.Length, Vel, ISA.Density)
-        Mission.TakeOff(Properties)
-        Mission.Climb(Properties)
-        Mission.ConstantEnergyCruise(Properties)
-        Mission.DescentCruise(Properties)
-        Dim Sround As Double = (1000 * (Payload + Properties.DistanceScore + Properties.AltitudeScore) / 3) * Properties.TakeOffBonus
+        Try
+            Mission.Initialize(Properties, Alt.Length, Vel, ISA.Density)
+            Mission.TakeOff(Properties)
+            Mission.Climb(Properties)
+            Mission.ConstantEnergyCruise(Properties)
+            Mission.DescentCruise(Properties)
+        Catch ex As ArgumentOutOfRangeException
+            score = 0
+            Return score
+        End Try
+        Dim Sround As Double = ((Payload + Properties.DistanceScore + Properties.AltitudeScore) / 3) * Properties.TakeOffBonus
         Return Sround
     End Function
 
@@ -75,7 +82,7 @@ Public Module Pilot
             Randomize()
             Dim i, L, WingPosX, Ct, Cr As Double
             For Each Surface As Surface In Model.Objects
-                If Surface.ID = MainWingID Then
+                If Surface.Id = MainWingID Then
                     Dim LiftingSurface As LiftingSurface = Surface
                     If DesignParameters.Contains(FormPilot.CheckBox2.Text) Then
                         i = DesignParameters.IndexOf(FormPilot.CheckBox2.Text)
@@ -89,7 +96,7 @@ Public Module Pilot
                     If DesignParameters.Contains(FormPilot.CheckBox6.Text) Then
                         i = DesignParameters.IndexOf(FormPilot.CheckBox6.Text)
                         LiftingSurface.WingRegions(0).CamberLineId = OpenVOGEL.DesignTools.DataStore.CamberLinesDatabase.CamberLines(X2(i)).ID
-                        LiftingSurface.WingRegions(0).PolarID = Model.PolarDataBase.Families(X2(i)).ID
+                        LiftingSurface.WingRegions(0).PolarId = Model.PolarDataBase.Families(X2(i)).Id
                         LiftingSurface.WingRegions(0).PolarFamiliy = Model.PolarDataBase.Families(X2(i))
                     End If
                     If DesignParameters.Contains(FormPilot.CheckBox8.Text) Then
@@ -97,7 +104,7 @@ Public Module Pilot
                         Athena.Aircraft.Models.Design.Payload = X2(i)
                     End If
                     LiftingSurface.GenerateMesh()
-                ElseIf Surface.ID = FuselageID Then
+                ElseIf Surface.Id = FuselageID Then
                     If DesignParameters.Contains(FormPilot.CheckBox9.Text) Then
                         Aero.FuselageLength(Model, X2(X2.GetUpperBound(0)))
                         L = X2(X2.GetUpperBound(0))
@@ -106,7 +113,7 @@ Public Module Pilot
             Next
 
             For Each Surface As Surface In Model.Objects
-                If Surface.ID = MainWingID Then
+                If Surface.Id = MainWingID Then
                     Dim LiftingSurface As LiftingSurface = Surface
                     If DesignParameters.Contains(FormPilot.CheckBox1.Text) Then
                         LiftingSurface.RootChord = Rnd() * (L / 2 - Ct) + Ct
@@ -134,7 +141,7 @@ Public Module Pilot
             Dim i As Integer = 0
             For Each Surface As Surface In Model.Objects
 
-                If Surface.ID = MainWingID Then
+                If Surface.Id = MainWingID Then
                     Dim LiftingSurface As LiftingSurface = Surface
 
                     If DesignParameters.Contains(FormPilot.CheckBox1.Text) Then
@@ -159,7 +166,7 @@ Public Module Pilot
                     End If
                     If DesignParameters.Contains(FormPilot.CheckBox6.Text) Then
                         LiftingSurface.WingRegions(0).CamberLineId = OpenVOGEL.DesignTools.DataStore.CamberLinesDatabase.CamberLines(X2(i)).ID
-                        LiftingSurface.WingRegions(0).PolarID = Model.PolarDataBase.Families(X2(i)).ID
+                        LiftingSurface.WingRegions(0).PolarId = Model.PolarDataBase.Families(X2(i)).Id
                         LiftingSurface.WingRegions(0).PolarFamiliy = Model.PolarDataBase.Families(X2(i))
                         i += 1
                     End If
@@ -172,7 +179,7 @@ Public Module Pilot
                     End If
                     LiftingSurface.GenerateMesh()
 
-                ElseIf Surface.ID = FuselageID Then
+                ElseIf Surface.Id = FuselageID Then
 
                     If DesignParameters.Contains(FormPilot.CheckBox9.Text) Then
                         Aero.FuselageLength(Model, X2(X2.GetUpperBound(0)))
@@ -216,17 +223,24 @@ Public Module Pilot
                     score -= (WingPosX - (0.75 * L - 0.15)) / (((0.75 * L - 0.15) - (0.25 * L)) * 100)
                 End If
 
-                Dim phi As Double = Math.Asin((L + 0.1) / 3)
-                Dim S As Double = 0.5 * Ct / Math.Sin(phi)
-                If LiftingSurface.WingRegions(0).Length < 0.1 Then '0.053 IS THE RADIOUS OF THE FUSELAGE
-                    score -= (0.1 - LiftingSurface.WingRegions(0).Length) / ((1.5 * Math.Cos(phi) - S - 0.053) - 0.1) * 100
-                ElseIf LiftingSurface.WingRegions(0).Length > (1.5 * Math.Cos(phi) - S - 0.053) Then
-                    score -= (LiftingSurface.WingRegions(0).Length - (1.5 * Math.Cos(phi) - S - 0.053)) / ((1.5 * Math.Cos(phi) - S - 0.053) - 0.1) * 100
+                'Dim phi As Double = Math.Asin((L + 0.1) / 3)
+                'Dim S As Double = 0.5 * Ct / Math.Sin(phi)
+                'If LiftingSurface.WingRegions(0).Length < 0.1 Then '0.053 IS THE RADIOUS OF THE FUSELAGE
+                '    score -= (0.1 - LiftingSurface.WingRegions(0).Length) / ((1.5 * Math.Cos(phi) - S - 0.053) - 0.1) * 100
+                'ElseIf LiftingSurface.WingRegions(0).Length > (1.5 * Math.Cos(phi) - S - 0.053) Then
+                '    score -= (LiftingSurface.WingRegions(0).Length - (1.5 * Math.Cos(phi) - S - 0.053)) / ((1.5 * Math.Cos(phi) - S - 0.053) - 0.1) * 100
+                'End If
+
+                'If LiftingSurface.WingRegions(0).Sweepback > rad2deg(Math.Atan((WingPosX - S * Math.Tan(phi)) / (-0.053 - (-LiftingSurface.WingRegions(0).Length)))) Then
+                '    score -= (LiftingSurface.WingRegions(0).Sweepback - rad2deg(Math.Atan((WingPosX - S * Math.Tan(phi)) / (-0.053 - (-LiftingSurface.WingRegions(0).Length))))) / (rad2deg(Math.Atan((WingPosX - S * Math.Tan(phi)) / (-0.053 - (-LiftingSurface.WingRegions(0).Length))))) * 100
+                'End If
+
+                Dim phi As Double = Math.Acos(L / 3)
+                Dim MaxSpan As Double = Math.Tan(phi) * WingPosX
+                If LiftingSurface.WingRegions(0).Length > MaxSpan Then
+                    score -= (LiftingSurface.WingRegions(0).Length - MaxSpan) / MaxSpan * 100
                 End If
 
-                If LiftingSurface.WingRegions(0).Sweepback > rad2deg(Math.Atan((WingPosX - S * Math.Tan(phi)) / (-0.053 - (-LiftingSurface.WingRegions(0).Length)))) Then
-                    score -= (LiftingSurface.WingRegions(0).Sweepback - rad2deg(Math.Atan((WingPosX - S * Math.Tan(phi)) / (-0.053 - (-LiftingSurface.WingRegions(0).Length))))) / (rad2deg(Math.Atan((WingPosX - S * Math.Tan(phi)) / (-0.053 - (-LiftingSurface.WingRegions(0).Length))))) * 100
-                End If
             End If
         Next
 

@@ -34,7 +34,7 @@ Namespace Performance
                 End If
             Next
 
-            AlfaScan(-3, 10.1, 1, Vel, Re, score)
+            AlfaScan(-3, 10.6, 1.5, Vel, Re, score)
 
         End Sub
 
@@ -57,7 +57,7 @@ Namespace Performance
 
                     Dim aeroforces As New AeroForces
                     Dim solver As New Solver
-                    Dim xx0 As Double = -10
+                    Dim xx0 As Double = -15
                     Dim Aero As New Aerodynamics
                     Aero.SetTailIncidence(xx0, MyProjectRoot.Model)
                     Steady(solver)
@@ -83,7 +83,7 @@ Namespace Performance
 
                     Dim aeroforces1 As New AeroForces
                     Dim solver1 As New Solver
-                    Dim xx1 As Double = 10
+                    Dim xx1 As Double = 15
                     Aero = New Aerodynamics
                     Aero.SetTailIncidence(xx1, MyProjectRoot.Model)
                     Steady(solver1)

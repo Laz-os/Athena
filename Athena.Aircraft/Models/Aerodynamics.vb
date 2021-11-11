@@ -29,9 +29,6 @@ Namespace Models
 
             Public Sub TailDesign(ByRef score As Integer, Constrained As Boolean)
                 Try
-                    If Constrained Then
-                        ElevatorSweepback(MyProjectRoot.Model)
-                    End If
                     FinDesign(MyProjectRoot.Model)
                     Dim xx0 As Double = 0.3
                     Dim xx1 As Double = 0.6
@@ -83,29 +80,6 @@ Namespace Models
 
             End Sub
 
-            ''sets the sweepback of the elevator in order to fit in the competition box
-            Private Sub ElevatorSweepback(ByRef model As DesignModel)
-
-                Dim L As Double
-                For Each Surface As Surface In model.Objects
-                    If Surface.Id = Models.Design.FuselageID Then
-                        Dim fuselage As Fuselage = Surface
-                        Dim NumSections As Integer
-                        NumSections = fuselage.CrossSections.Count
-                        L = fuselage.CrossSections(NumSections - 1).Z
-                    End If
-                Next
-                For Each Surface As Surface In model.Objects
-                    If Surface.Id = ElevatorID Then
-                        Dim LiftingSurface As LiftingSurface = Surface
-                        Dim phi As Double = Math.Asin((L + 0.1) / 3)
-                        LiftingSurface.WingRegions(0).Sweepback = rad2deg(phi) - 90
-                        LiftingSurface.GenerateMesh()
-                    End If
-                Next
-
-                LoadWingAnchorsToBody(model)
-            End Sub
             Private Sub FinDesign(ByRef model As DesignModel)
 
                 Dim length As Double
@@ -139,7 +113,7 @@ Namespace Models
                 LoadWingAnchorsToBody(model)
             End Sub
 
-            Public Function TailSize(Length As Double, Constrained As Boolean) ', ByRef Model As DesignModel)
+            Public Function TailSize(Length As Double, Constrained As Boolean)
                 SetTailLength(Length, MyProjectRoot.Model, Constrained)
                 Dim solver As New Solver
                 'Steady(solver)
@@ -150,34 +124,65 @@ Namespace Models
             End Function
 
             Private Sub SetTailLength(Lenght As Double, ByRef Model As DesignModel, Constrained As Boolean)
-                Dim AR As Decimal = 6
-                Dim PosY, chord, Dihedral As Double
-                Dim Elevator As LiftingSurface
-                Dim Region As WingRegion
-                For Each Surface As Surface In Model.Objects
-                    If Surface.Id = ElevatorID Then
-                        Elevator = Surface
-                        PosY = Surface.Position.Y
-                        For Each WingRegion As WingRegion In Elevator.WingRegions
-                            Region = WingRegion
-                            Region.Length = Lenght
-                            Dihedral = deg2rad(WingRegion.Dihedral)
-                            Dim span As Double = 2 * Math.Cos(Dihedral) * Lenght + 2 * PosY
-                            Dim area As Double = span ^ 2 / AR
-                            chord = (area / 2) / (Lenght + PosY)
-                            If Constrained Then
-                                Elevator.RootChord = chord + (Region.Length / Math.Tan(deg2rad(Region.Sweepback)))
-                                Region.Sweepback = 0
-                                Region.TipChord = chord
-                                Continue For
+                Select Case Constrained
+                    Case True
+
+                        Dim L, PosY As Double
+                        Dim Elevator As LiftingSurface
+
+                        For Each Surface As Surface In Model.Objects
+                            If Surface.Id = Models.Design.FuselageID Then
+                                Dim fuselage As Fuselage = Surface
+                                Dim NumSections As Integer
+                                NumSections = fuselage.CrossSections.Count
+                                L = fuselage.CrossSections(NumSections - 1).Z
                             End If
-                            Elevator.RootChord = chord
-                            Region.TipChord = chord
                         Next
-                        Elevator.GenerateMesh()
-                    End If
-                Next
-                ElevatorLongPosition(Model, chord)
+                        Dim phi As Double = Math.Acos(L / 3)
+                        For Each Surface As Surface In Model.Objects
+                            If Surface.Id = ElevatorID Then
+                                Elevator = Surface
+                                PosY = Surface.Position.Y
+                                For Each WingRegion As WingRegion In Elevator.WingRegions
+                                    WingRegion.Length = Lenght
+                                    WingRegion.Sweepback = 0
+                                    WingRegion.TipChord = 0.02
+                                    Elevator.RootChord = 0.02 + (Lenght / Math.Tan(phi))
+                                    Elevator.Position.X = L - Elevator.RootChord - 0.05
+                                Next
+                                Elevator.GenerateMesh()
+                            End If
+                        Next
+
+                    Case Else
+                        Dim AR As Decimal = 6
+                        Dim PosY, chord, Dihedral As Double
+                        Dim Elevator As LiftingSurface
+                        For Each Surface As Surface In Model.Objects
+                            If Surface.Id = ElevatorID Then
+                                Elevator = Surface
+                                PosY = Surface.Position.Y
+                                For Each WingRegion As WingRegion In Elevator.WingRegions
+                                    WingRegion.Length = Lenght
+                                    Dihedral = deg2rad(WingRegion.Dihedral)
+                                    Dim span As Double = 2 * Math.Cos(Dihedral) * Lenght + 2 * PosY
+                                    Dim area As Double = span ^ 2 / AR
+                                    chord = (area / 2) / (Lenght + PosY)
+                                    'If Constrained And Region.Sweepback <> 0 Then
+                                    '    Elevator.RootChord = chord + (Region.Length / Math.Tan(deg2rad(Math.Abs(Region.Sweepback))))
+                                    '    Region.Sweepback = 0
+                                    '    Region.TipChord = chord
+                                    '    Continue For
+                                    'End If
+                                    Elevator.RootChord = chord
+                                    WingRegion.TipChord = chord
+                                Next
+                                Elevator.GenerateMesh()
+                            End If
+                        Next
+                        ElevatorLongPosition(Model, chord)
+                End Select
+
                 LoadWingAnchorsToBody(Model)
             End Sub
 
@@ -263,7 +268,7 @@ Namespace Models
                 Dim defl As Double
                 Dim Cancel As Boolean
 
-                If root < -90 Or root > 90 Then
+                If root < -60 Or root > 60 Then
                     If g0 > 0.01 AndAlso g1 > 0.01 Then
                         Cancel = True
                         defl = 0

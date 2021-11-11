@@ -262,42 +262,42 @@ Public Class FormPilot
     End Sub
 
     'This Sub set the constrains For the ACC (it Is To be used only In constrained optimization algorithm)
-    'Private Sub CheckBox10_CheckedChanged(sender As Object, e As EventArgs) Handles CheckBox10.CheckedChanged
+    Private Sub CheckBox10_CheckedChanged(sender As Object, e As EventArgs) Handles CheckBox10.CheckedChanged
 
-    '    CheckBox3.Checked = False
-    '    CheckBox4.Checked = False
-    '    CheckBox3.Enabled = Not CheckBox10.Checked
-    '    CheckBox4.Enabled = Not CheckBox10.Checked
+        '    CheckBox3.Checked = False
+        CheckBox4.Checked = False
+        '    CheckBox3.Enabled = Not CheckBox10.Checked
+        CheckBox4.Enabled = Not CheckBox10.Checked
 
-    '    'fuselage length
-    '    CheckBox9.Checked = CheckBox10.Checked
-    '    CheckBox9.Enabled = Not CheckBox10.Checked
-    '    NumericUpDown22.Minimum = 0.3
-    '    NumericUpDown23.Maximum = 2
+        '    'fuselage length
+        '    CheckBox9.Checked = CheckBox10.Checked
+        '    CheckBox9.Enabled = Not CheckBox10.Checked
+        '    NumericUpDown22.Minimum = 0.3
+        '    NumericUpDown23.Maximum = 2
 
-    '    'Tipchord
-    '    CheckBox2.Checked = CheckBox10.Checked
-    '    CheckBox2.Enabled = Not CheckBox10.Checked
-    '    NumericUpDown3.Minimum = 0
-    '    NumericUpDown4.Maximum = 0.1
+        '    'Tipchord
+        '    CheckBox2.Checked = CheckBox10.Checked
+        '    CheckBox2.Enabled = Not CheckBox10.Checked
+        '    NumericUpDown3.Minimum = 0
+        '    NumericUpDown4.Maximum = 0.1
 
-    '    'Rootchord
-    '    CheckBox1.Checked = CheckBox10.Checked
-    '    CheckBox1.Enabled = Not CheckBox10.Checked
-    '    NumericUpDown1.Enabled = False
-    '    NumericUpDown1.Value = 0
-    '    NumericUpDown2.Enabled = False
-    '    NumericUpDown2.Value = 0
+        '    'Rootchord
+        '    CheckBox1.Checked = CheckBox10.Checked
+        '    CheckBox1.Enabled = Not CheckBox10.Checked
+        '    NumericUpDown1.Enabled = False
+        '    NumericUpDown1.Value = 0
+        '    NumericUpDown2.Enabled = False
+        '    NumericUpDown2.Value = 0
 
-    '    'wing long pos
-    '    CheckBox7.Checked = CheckBox10.Checked
-    '    CheckBox7.Enabled = Not CheckBox10.Checked
-    '    NumericUpDown13.Enabled = False
-    '    NumericUpDown13.Value = 0
-    '    NumericUpDown14.Enabled = False
-    '    NumericUpDown14.Value = 0
+        '    'wing long pos
+        '    CheckBox7.Checked = CheckBox10.Checked
+        '    CheckBox7.Enabled = Not CheckBox10.Checked
+        '    NumericUpDown13.Enabled = False
+        '    NumericUpDown13.Value = 0
+        '    NumericUpDown14.Enabled = False
+        '    NumericUpDown14.Value = 0
 
-    'End Sub
+    End Sub
 
 
 End Class

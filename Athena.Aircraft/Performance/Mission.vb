@@ -48,6 +48,9 @@ Namespace Performance
                 n += 1
                 i += 1
             Loop
+            If Properties.AoA.Length < 5 Then
+                Throw New ArgumentOutOfRangeException
+            End If
             Select Case PolarNo
                 Case 1
                     Dim Polyonym = polyfit2(Properties.Lift, Properties.Drag)
@@ -150,6 +153,9 @@ Namespace Performance
 
                 ''next timestep status''
                 TakeOff_Distance += Vinst * dt + 0.5 * Accel * dt ^ 2
+                If TakeOff_Distance > 60 Then
+                    Throw New ArgumentOutOfRangeException
+                End If
                 Vinst += Accel * dt
                 If Vinst >= Vrotate Then
                     Exit While
@@ -161,8 +167,6 @@ Namespace Performance
                 Properties.TakeOffBonus = 1.1
             ElseIf TakeOff_Distance <= 60 Then
                 Properties.TakeOffBonus = 1
-            Else
-                Properties.TakeOffBonus = 0
             End If
             Properties.DistanceTotal = TakeOff_Distance
             Properties.DistanceRotate = TakeOff_Distance
@@ -298,7 +302,7 @@ Namespace Performance
             Properties.EnergyAltitudeCeiling = He
 
             Properties.PreScore_Altitude_Team = (-3.92 * 10 ^ (-5)) * (Alt ^ 4) + (1.08 * 10 ^ (-2)) * (Alt ^ 3) + (-1.156) * (Alt ^ 2) + 64.2 * Alt - 537
-            Properties.AltitudeScore = 1000 * Properties.PreScore_Altitude_Team
+            Properties.AltitudeScore = Properties.PreScore_Altitude_Team
 
         End Sub
 
@@ -333,7 +337,9 @@ Namespace Performance
                     End If
                 Next
             Next
-
+            If Properties.V_MAX = 0 Then
+                Throw New ArgumentOutOfRangeException
+            End If
             ''find optimum cruise point =>Vmax | He=const =>T=D | SEP=0
 
             Vel = Properties.VelocityCeiling
@@ -578,7 +584,7 @@ Namespace Performance
                 Vel = Properties.V_MAX + 0.2 * Properties.V_MAX
                 He += -dHe
             End While
-            Properties.DistanceScore = 1000 * Properties.DistanceDescentCruise
+            Properties.DistanceScore = Properties.DistanceDescentCruise
         End Sub
 
     End Class
