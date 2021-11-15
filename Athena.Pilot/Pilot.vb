@@ -53,12 +53,9 @@ Public Module Pilot
 
 
         For i = 0 To UBound(Alt, 1) 'Each altitude In Alt
-            Performance.DragPolar(Alt(i), mach(i), score)
+            Performance.DragPolar(Alt(i), mach(i))
         Next
 
-        If score = 1 Then
-            Return score
-        End If
 #End Region
         Dim Mission As New Performance.Mission
         Dim Properties As New Performance.Mission.MissionProperties

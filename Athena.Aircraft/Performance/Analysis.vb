@@ -20,7 +20,7 @@ Namespace Performance
             MyProjectRoot.StartCalculation(CalculationType.Aeroelastic, CalculationCore)
         End Sub
 
-        Public Sub DragPolar(altitude As Double, mach As Double, ByRef score As Integer)
+        Public Sub DragPolar(altitude As Double, mach As Double)
             Commands.CalculationCommand.set_altitude(altitude)
             Dim ISA As New StandardAtmosphere(altitude)
             Dim Vel As Double = mach * ISA.SoundSpeed
@@ -34,14 +34,14 @@ Namespace Performance
                 End If
             Next
 
-            AlfaScan(-3, 10.6, 1.5, Vel, Re, score)
+            AlfaScan(-3, 10.6, 1.5, Vel, Re)
 
         End Sub
 
         ''' Performs a series of steady analysis between Alfa1 and Alfa2 using the AlfaStep in between.
         Public Sub AlfaScan(Alfa1 As Double,
                                 Alfa2 As Double,
-                                AlfaS As Double, V As Double, Reynolds As Double, ByRef score As Integer)
+                                AlfaS As Double, V As Double, Reynolds As Double)
 
             If Alfa2 < Alfa1 Then
                 System.Console.WriteLine("the first angle must be smaller than the second one")
@@ -94,7 +94,6 @@ Namespace Performance
                     Aero = New Aerodynamics
                     Dim CheckDef = Aero.CheckDeflection(root, g0, g1)
                     If CheckDef.Cancel Then
-                        score = 1
                         Continue For
                     End If
                     While Math.Abs(CheckDef.defl) > 0.01
@@ -106,18 +105,16 @@ Namespace Performance
                         Aero = New Aerodynamics
                         CheckDef = Aero.CheckDeflection(root, g0, g1)
                         If CheckDef.Cancel Then
-                            score = 1
                             Continue For
                         End If
                     End While
                     CheckDef.Forces.Re = Reynolds
                     CheckDef.Forces.Deflection = root
-                    score = 0
+
 
                     Loads.Add(CheckDef.Forces)
 
                 Catch exc As Exception
-                    score = 1
                     Continue For
                 End Try
 

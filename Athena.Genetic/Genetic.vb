@@ -36,7 +36,7 @@ Public Class Genetic
                 For j = 1 To Nvar
                     X2(j - 1) = Xpop(k - 1, j - 1) * (Xmax(j - 1) - Xmin(j - 1)) + Xmin(j - 1)
                     If j = (AirfoilIndex + 1) AndAlso AirfoilUse Then
-                        X2(j - 1) = Math.Round(X2(j - 1))
+                        X2(j - 1) = Math.Floor(X2(j - 1))
                     End If
                 Next
                 Fpop(k - 1) = Eval(X2, Constrained)

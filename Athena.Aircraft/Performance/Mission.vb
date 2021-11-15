@@ -153,7 +153,7 @@ Namespace Performance
 
                 ''next timestep status''
                 TakeOff_Distance += Vinst * dt + 0.5 * Accel * dt ^ 2
-                If TakeOff_Distance > 60 Then
+                If TakeOff_Distance > 60 OrElse Timestep * dt > 60 Then
                     Throw New ArgumentOutOfRangeException
                 End If
                 Vinst += Accel * dt
@@ -285,6 +285,8 @@ Namespace Performance
                 V_old = Vel
                 If Alt >= 107.5 OrElse (Properties.TimeRotate + Properties.TimeLiftOff + Properties.TimeCeiling) >= 60 Then
                     Exit While
+                ElseIf Double.IsInfinity(Vel) OrElse Thrust_req < 0 Then
+                    Throw New ArgumentOutOfRangeException
                 End If
 
                 ''time to go from Hei to Hei+1///if timer exceeds 60sec then climb is terminated and total (time = Timer.Climb -= dHe / SEP1)
@@ -369,15 +371,9 @@ Namespace Performance
                 End If
                 If ExT < 10 ^ (-3) Then
                     Exit While
+                ElseIf Double.IsInfinity(Vel) OrElse Thrust_req < 0 Then
+                    Throw New ArgumentOutOfRangeException
                 End If
-                'dt = Math.Abs(dV / Accel)
-                'If (Properties.TimeRotate + Properties.TimeLiftOff + Properties.TimeCeiling) < 60 Then
-                '    Properties.TimeCeiling += dt
-                'Else
-                '    Properties.TimeConstantEnergy += dt
-                'End If
-                'Properties.TimeConstantEnergy += dt
-                'Properties.DistanceConstantEnergy += Vel * dt + 0.5 * Accel * dt ^ 2
 
                 Vel += dV
 
@@ -403,7 +399,10 @@ Namespace Performance
 
                 If Vel - Properties.V_MAX > 0.2 * Properties.V_MAX Then
                     Exit While
+                ElseIf Double.IsInfinity(Vel) OrElse Thrust_req < 0 Then
+                    Throw New ArgumentOutOfRangeException
                 End If
+
                 'dt = Math.Abs(dV / Accel)
                 'Properties.TimeConstantEnergy += dt
                 'Properties.DistanceConstantEnergy += Vel * dt + 0.5 * Accel * dt ^ 2
@@ -461,10 +460,10 @@ Namespace Performance
                 Gradient = (DESC2 - DESC1) / dV
                 If Math.Abs(Gradient) < (10 ^ (-4)) Then
                     Exit While
+                ElseIf Double.IsInfinity(Vel) OrElse Thrust_req < 0 Then
+                    Throw New ArgumentOutOfRangeException
                 End If
-                'dt = Math.Abs(dV / Accel)
-                'Properties.TimeConstantEnergy += dt
-                'Properties.DistanceConstantEnergy += Vel * dt + 0.5 * Accel * dt ^ 2
+
                 dV = 0.1
                 Vel = Vel1 + dV
             End While
@@ -492,13 +491,11 @@ Namespace Performance
 
             dt = Math.Abs(dHe / SEP1)
             Properties.TimeDescentCruise += dt
-
             Vel_old = Properties.VelocityFinalConstantEnergy
             Vel = Properties.V_MAX + 0.2 * Properties.V_MAX
             He = Properties.EnergyAltitudeCeiling - dHe
             dV = 0.1
             While True
-
                 While True
                     Alt = He - Vel ^ 2 / (2 * 9.81)
                     ISA.CalculateAirProperties(Alt)
@@ -533,7 +530,6 @@ Namespace Performance
                     DESC2 = (Vel1 - Properties.V_MAX) / SEP2
                     r2 = DESC2 / SEP2
                     If (DESC2 - DESC1) > 0 Then
-                        'If (r1 - r2) < 0 Then
                         dV /= 10
                         Continue While
                     End If
@@ -576,6 +572,9 @@ Namespace Performance
                         Accel = (Thrust_max - Thrust_req) / (Properties.TakeOffWeight / 9.81)
                     End While
                     Exit While
+
+                ElseIf Double.IsInfinity(Vel) OrElse Thrust_req < 0 Then
+                    Throw New ArgumentOutOfRangeException
                 End If
 
                 Properties.TimeDescentCruise += dt
@@ -584,6 +583,7 @@ Namespace Performance
                 Vel = Properties.V_MAX + 0.2 * Properties.V_MAX
                 He += -dHe
             End While
+
             Properties.DistanceScore = Properties.DistanceDescentCruise
         End Sub
 
