@@ -147,7 +147,7 @@ Namespace Models
                                     WingRegion.Length = Lenght
                                     WingRegion.Sweepback = 0
                                     WingRegion.TipChord = 0.03
-                                    Elevator.RootChord = 0.03 + (Lenght / Math.Tan(Math.PI / 2 - phi))
+                                    Elevator.RootChord = 0.03 + (Lenght / Math.Tan(phi))
                                     Elevator.Position.X = L - Elevator.RootChord - 0.05
                                 Next
                                 Elevator.GenerateMesh()
