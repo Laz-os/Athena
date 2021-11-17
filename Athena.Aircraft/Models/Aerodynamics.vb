@@ -138,7 +138,7 @@ Namespace Models
                                 L = fuselage.CrossSections(NumSections - 1).Z
                             End If
                         Next
-                        Dim phi As Double = Math.Asin(L / 3)
+                        Dim phi As Double = Math.Acos(L / 3)
                         For Each Surface As Surface In Model.Objects
                             If Surface.Id = ElevatorID Then
                                 Elevator = Surface
@@ -146,8 +146,8 @@ Namespace Models
                                 For Each WingRegion As WingRegion In Elevator.WingRegions
                                     WingRegion.Length = Lenght
                                     WingRegion.Sweepback = 0
-                                    WingRegion.TipChord = 0.03
-                                    Elevator.RootChord = 0.03 + (Lenght / Math.Tan(phi))
+                                    WingRegion.TipChord = 0.02
+                                    Elevator.RootChord = 0.02 + (Lenght / Math.Tan(phi))
                                     Elevator.Position.X = L - Elevator.RootChord - 0.05
                                 Next
                                 Elevator.GenerateMesh()
