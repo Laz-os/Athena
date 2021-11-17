@@ -232,7 +232,7 @@ Public Module Pilot
                 '    score -= (LiftingSurface.WingRegions(0).Sweepback - rad2deg(Math.Atan((WingPosX - S * Math.Tan(phi)) / (-0.053 - (-LiftingSurface.WingRegions(0).Length))))) / (rad2deg(Math.Atan((WingPosX - S * Math.Tan(phi)) / (-0.053 - (-LiftingSurface.WingRegions(0).Length))))) * 100
                 'End If
 
-                Dim phi As Double = Math.Acos(L / 3)
+                Dim phi As Double = Math.Asin(L / 3)
                 Dim MaxSpan As Double = Math.Tan(phi) * WingPosX
                 If LiftingSurface.WingRegions(0).Length > MaxSpan Then
                     score -= (LiftingSurface.WingRegions(0).Length - MaxSpan) / MaxSpan * 100
