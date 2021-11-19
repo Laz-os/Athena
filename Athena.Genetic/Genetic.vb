@@ -34,7 +34,9 @@ Public Class Genetic
 
         For i = 1 To Ngen
             Dim DistanceBest, PayloadBest, AltitudeBest As Double
-            DistanceBest = AltitudeBest = PayloadBest = 0.1 '0.1 to avoid division by 0 at line 70 
+            DistanceBest = 0.0123
+            AltitudeBest = 0.0123
+            PayloadBest = 0.0123 '0.0123 to avoid division by 0 at line 70 
 
             For k = 1 To Npop - Nelite2
                 For j = 1 To Nvar
