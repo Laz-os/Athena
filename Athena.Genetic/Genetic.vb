@@ -14,7 +14,7 @@ Public Class Genetic
     Public Property AirfoilIndex As Double
     Public Property AirfoilUse As Boolean = False
 
-    Delegate Function Fnc(X As Array, Y As Boolean) As (DistanceScore As Double, PayloadScore As Double, AltitudeScore As Double, TakeOffBonus As Double)
+    Delegate Function Fnc(X As Array, Y As Boolean) As (DistanceScore As Double, PayloadScore As Double, AltitudeScore As Double, TakeOffBonus As Double, Failed As Boolean)
 
     Public Sub GenAl(ByRef Eval As Fnc, Constrained As Boolean)
         Randomize()
@@ -27,17 +27,16 @@ Public Class Genetic
             Next
         Next
         Dim Fpop(Npop - 1) As Double
-        Dim FpopTemp(Npop - 1, 3) As Double '= New Double(,) {}
+        Dim FpopTemp(Npop - 1, 4) As Double
         Dim Nelite2 As Integer = 0
         Dim XFpop(,) As Double = New Double(,) {}
         Dim Gbest As Double
 
         For i = 1 To Ngen
             Dim DistanceBest, PayloadBest, AltitudeBest As Double
-            DistanceBest = 0.0123
-            AltitudeBest = 0.0123
-            PayloadBest = 0.0123 '0.0123 to avoid division by 0 at line 70 
-
+            DistanceBest = 0
+            AltitudeBest = 0
+            PayloadBest = 0
             For k = 1 To Npop - Nelite2
                 For j = 1 To Nvar
                     X2(j - 1) = Xpop(k - 1, j - 1) * (Xmax(j - 1) - Xmin(j - 1)) + Xmin(j - 1)
@@ -45,9 +44,10 @@ Public Class Genetic
                         X2(j - 1) = Math.Floor(X2(j - 1))
                     End If
                 Next
-                Try
-                    Dim Sround = Eval(X2, Constrained)
 
+                Dim Sround = Eval(X2, Constrained)
+
+                If Sround.Failed = False Then
                     If Sround.DistanceScore > DistanceBest Then
                         DistanceBest = Sround.DistanceScore
                     End If
@@ -57,19 +57,21 @@ Public Class Genetic
                     If Sround.AltitudeScore > AltitudeBest Then
                         AltitudeBest = Sround.AltitudeScore
                     End If
-                    FpopTemp(k - 1, 0) = Sround.DistanceScore
+                End If
+                FpopTemp(k - 1, 0) = Sround.DistanceScore
                     FpopTemp(k - 1, 1) = Sround.PayloadScore
                     FpopTemp(k - 1, 2) = Sround.AltitudeScore
                     FpopTemp(k - 1, 3) = Sround.TakeOffBonus
-                Catch ex As ArgumentOutOfRangeException
-                    FpopTemp(k - 1, 0) = 0
-                    FpopTemp(k - 1, 1) = 0
-                    FpopTemp(k - 1, 2) = 0
-                    FpopTemp(k - 1, 3) = 0
-                End Try
+                    FpopTemp(k - 1, 4) = Sround.Failed
+
             Next
             For k = 1 To Npop - Nelite2
-                Fpop(k - 1) = (1000 * (FpopTemp(k - 1, 0) / DistanceBest + FpopTemp(k - 1, 1) / PayloadBest + FpopTemp(k - 1, 2) / AltitudeBest) / 3) * FpopTemp(k - 1, 3)
+                Select Case FpopTemp(k - 1, 4)
+                    Case False
+                        Fpop(k - 1) = (1000 * (FpopTemp(k - 1, 0) / DistanceBest + FpopTemp(k - 1, 1) / PayloadBest + FpopTemp(k - 1, 2) / AltitudeBest) / 3) * FpopTemp(k - 1, 3)
+                    Case True
+                        Fpop(k - 1) = FpopTemp(k - 1, 3)
+                End Select
             Next
 
             Nelite2 = Nelite

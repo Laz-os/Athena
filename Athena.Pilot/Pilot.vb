@@ -14,11 +14,12 @@ Public Module Pilot
 
     Public Property DesignParameters As New List(Of String)
 
-    Public Function StartCalculation(X2 As Array, Constrained As Boolean) As (DistanceScore As Double, PayloadScore As Double, AltitudeScore As Double, BonusTakeOff As Double)
+    Public Function StartCalculation(X2 As Array, Constrained As Boolean) As (DistanceScore As Double, PayloadScore As Double, AltitudeScore As Double, BonusTakeOff As Double, Failed As Boolean)
         Dim DistanceScore As Double = 0
         Dim PayloadScore As Double = 0
         Dim AltitudeScore As Double = 0
         Dim score As Integer = 0
+
 #Region "tail sizing"
         Dim Aero As New Aerodynamics
 
@@ -36,12 +37,12 @@ Public Module Pilot
         If Constrained Then
             Check_ACC_Constrains(score, MyProjectRoot.Model)
             If score < 0 Then
-                Return (0, 0, 0, 0)
+                Return (0, 0, 0, score, True)
             End If
         End If
         Aero.TailDesign(score, Constrained)
         If score = 1 Then
-            Return (1, 1, 1, 1)
+            Return (0, 0, 0, 5, True)
         End If
         Loads.Clear()
 #End Region
@@ -68,11 +69,9 @@ Public Module Pilot
             Mission.ConstantEnergyCruise(Properties)
             Mission.DescentCruise(Properties)
         Catch ex As ArgumentOutOfRangeException
-            score = 0
-            Return (0, 0, 0, 0)
+            Return (0, 0, 0, 10, True)
         End Try
-        'Dim Sround As Double = ((Payload + Properties.DistanceScore + Properties.AltitudeScore) / 3) * Properties.TakeOffBonus
-        Return (Properties.DistanceScore, Payload, Properties.AltitudeScore, Properties.TakeOffBonus)
+        Return (Properties.DistanceScore, Payload, Properties.AltitudeScore, Properties.TakeOffBonus, False)
     End Function
 
 
