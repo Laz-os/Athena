@@ -289,7 +289,7 @@ Public Class Functions
         For i = LBound(Ar) To UBound(Ar)
             If min_value > Ar(i) Then min_value = Ar(i)
         Next
-        Min = min_value
+        Return min_value
     End Function
 
     Public Shared Function Max(Ar() As Double)
@@ -297,7 +297,7 @@ Public Class Functions
         For i = LBound(Ar) To UBound(Ar)
             If max_value < Ar(i) Then max_value = Ar(i)
         Next
-        Max = max_value
+        Return max_value
     End Function
 
     Public Shared Function interp2d(ArX() As Double, ArY() As Double, ArZ() As Double, X As Double, Y As Double) As Double
@@ -329,73 +329,76 @@ Public Class Functions
         Next
 
         MasterArray = SortThisArray(MasterArray, 0, 1, False)
+        Dim ArX_(ArX.GetUpperBound(0)) As Double
+        Dim ArY_(ArX.GetUpperBound(0)) As Double
+        Dim Arz_(ArX.GetUpperBound(0)) As Double
         For i = 0 To ArX.GetUpperBound(0)
-            ArX(i) = MasterArray(i, 0)
-            ArY(i) = MasterArray(i, 1)
-            ArZ(i) = MasterArray(i, 2)
+            ArX_(i) = MasterArray(i, 0)
+            ArY_(i) = MasterArray(i, 1)
+            Arz_(i) = MasterArray(i, 2)
         Next
 
-        Dim X1 As Double = Array.FindLast(Of Double)(ArX, Function(value) value <= X)
-        Dim X2 As Double = Array.Find(Of Double)(ArX, Function(value) value >= X)
+        Dim X1 As Double = Array.FindLast(Of Double)(ArX_, Function(value) value <= X)
+        Dim X2 As Double = Array.Find(Of Double)(ArX_, Function(value) value >= X)
         Dim f11, f12, f21, f22, c As Double
 
         If X1 = X2 Then
             'only the data from the corresponding Reynolds are to be used
-            Dim iX1 As Integer = Array.IndexOf(Of Double)(ArX, X1)
-            Dim iX2 As Integer = Array.LastIndexOf(Of Double)(ArX, X2)
+            Dim iX1 As Integer = Array.IndexOf(Of Double)(ArX_, X1)
+            Dim iX2 As Integer = Array.LastIndexOf(Of Double)(ArX_, X2)
             Dim ArY1(iX2 - iX1) As Double
             Dim ArZ1(iX2 - iX1) As Double
-            Array.Copy(ArY, iX1, ArY1, 0, ArY1.Length)
-            Array.Copy(ArZ, iX1, ArZ1, 0, ArY1.Length)
+            Array.Copy(ArY_, iX1, ArY1, 0, ArY1.Length)
+            Array.Copy(Arz_, iX1, ArZ1, 0, ArY1.Length)
             c = interp1d(ArY1, ArZ1, Y)
             Return c
         End If
 
         MasterArray = SortThisArray(MasterArray, 1, 0, False)
         For i = 0 To ArX.GetUpperBound(0)
-            ArX(i) = MasterArray(i, 0)
-            ArY(i) = MasterArray(i, 1)
-            ArZ(i) = MasterArray(i, 2)
+            ArX_(i) = MasterArray(i, 0)
+            ArY_(i) = MasterArray(i, 1)
+            Arz_(i) = MasterArray(i, 2)
         Next
 
-        Dim Y1 As Double = Array.FindLast(Of Double)(ArY, Function(value) value <= Y)
-        Dim Y2 As Double = Array.Find(Of Double)(ArY, Function(value) value >= Y)
+        Dim Y1 As Double = Array.FindLast(Of Double)(ArY_, Function(value) value <= Y)
+        Dim Y2 As Double = Array.Find(Of Double)(ArY_, Function(value) value >= Y)
 
         If Y1 = Y2 Then
 
-            Dim iY1 As Integer = Array.IndexOf(Of Double)(ArY, Y1)
-            Dim iY2 As Integer = Array.LastIndexOf(Of Double)(ArY, Y2)
+            Dim iY1 As Integer = Array.IndexOf(Of Double)(ArY_, Y1)
+            Dim iY2 As Integer = Array.LastIndexOf(Of Double)(ArY_, Y2)
             Dim ArX1(iY2 - iY1) As Double
             Dim ArZ1(iY2 - iY1) As Double
-            Array.Copy(ArX, iY1, ArX1, 0, ArX1.Length)
-            Array.Copy(ArZ, iY1, ArZ1, 0, ArX1.Length)
+            Array.Copy(ArX_, iY1, ArX1, 0, ArX1.Length)
+            Array.Copy(Arz_, iY1, ArZ1, 0, ArX1.Length)
             c = interp1d(ArX1, ArZ1, X)
             Return c
         End If
 
         MasterArray = SortThisArray(MasterArray, 0, 1, False)
         For i = 0 To ArX.GetUpperBound(0)
-            ArX(i) = MasterArray(i, 0)
-            ArY(i) = MasterArray(i, 1)
-            ArZ(i) = MasterArray(i, 2)
+            ArX_(i) = MasterArray(i, 0)
+            ArY_(i) = MasterArray(i, 1)
+            Arz_(i) = MasterArray(i, 2)
         Next
 
         For i = 1 To ArX.Length
 
-            If ArX(i - 1) = X1 Then
+            If ArX_(i - 1) = X1 Then
 
-                If ArY(i - 1) = Y1 Then
-                    f11 = ArZ(i - 1)
-                ElseIf ArY(i - 1) = Y2 Then
-                    f12 = ArZ(i - 1)
+                If ArY_(i - 1) = Y1 Then
+                    f11 = Arz_(i - 1)
+                ElseIf ArY_(i - 1) = Y2 Then
+                    f12 = Arz_(i - 1)
                 End If
 
-            ElseIf ArX(i - 1) = X2 Then
+            ElseIf ArX_(i - 1) = X2 Then
 
-                If ArY(i - 1) = Y1 Then
-                    f21 = ArZ(i - 1)
-                ElseIf ArY(i - 1) = Y2 Then
-                    f22 = ArZ(i - 1)
+                If ArY_(i - 1) = Y1 Then
+                    f21 = Arz_(i - 1)
+                ElseIf ArY_(i - 1) = Y2 Then
+                    f22 = Arz_(i - 1)
                 End If
             End If
         Next

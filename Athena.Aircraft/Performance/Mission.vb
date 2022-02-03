@@ -14,6 +14,7 @@ Namespace Performance
         Public Property Accel As Double
         Public Property AOA_unstick As Double
         Public Property μ As Double 'ground friction coefficient
+        Public Property GroundEffect As Boolean
 
         Public Sub Initialize(ByRef Properties As MissionProperties, ByVal PolarNo As Double, ByVal Vel As Double, Density As Double)
 
@@ -26,6 +27,11 @@ Namespace Performance
             ReDim Properties.Reynolds(Loads.Count - 1)
             ReDim Properties.AoA(Loads.Count - 1)
             ReDim Properties.Elevator_Deflection(Loads.Count - 1)
+            ReDim Properties.Drag_GE(Loads.Count * Loads(0).Altitude_GroundEffect.Count - 1)
+            ReDim Properties.Lift_GE(Loads.Count * Loads(0).Altitude_GroundEffect.Count - 1)
+            ReDim Properties.Altitude_GE(Loads.Count * Loads(0).Altitude_GroundEffect.Count - 1)
+            ReDim Properties.AOA_GE(Loads.Count * Loads(0).Altitude_GroundEffect.Count - 1)
+
             Dim q As Double = 0.5 * Density * (WingArea / 2) * (Vel ^ 2)
             Dim i, n As Integer
             i = 0
@@ -36,7 +42,11 @@ Namespace Performance
                     ReDim Preserve Properties.Lift(Properties.Lift.GetUpperBound(0) - 1)
                     ReDim Preserve Properties.Reynolds(Properties.Reynolds.GetUpperBound(0) - 1)
                     ReDim Preserve Properties.AoA(Properties.AoA.GetUpperBound(0) - 1)
-                    ReDim Properties.Elevator_Deflection(Properties.Elevator_Deflection.GetUpperBound(0) - 1)
+                    ReDim Preserve Properties.Elevator_Deflection(Properties.Elevator_Deflection.GetUpperBound(0) - 1)
+                    ReDim Preserve Properties.Drag_GE(Properties.Drag_GE.GetUpperBound(0) - Loads(0).Altitude_GroundEffect.Count)
+                    ReDim Preserve Properties.Lift_GE(Properties.Lift_GE.GetUpperBound(0) - Loads(0).Altitude_GroundEffect.Count)
+                    ReDim Preserve Properties.Altitude_GE(Properties.Altitude_GE.GetUpperBound(0) - Loads(0).Altitude_GroundEffect.Count)
+                    ReDim Preserve Properties.AOA_GE(Properties.AOA_GE.GetUpperBound(0) - Loads(0).Altitude_GroundEffect.Count)
                     i += 1
                     Continue Do
                 End If
@@ -45,10 +55,17 @@ Namespace Performance
                 Properties.Reynolds(n) = Loads(i).Re
                 Properties.AoA(n) = Math.Round(Loads(i).AoA, 1)
                 Properties.Elevator_Deflection(n) = Loads(i).Deflection
+                For m = 0 To Loads(0).Altitude_GroundEffect.Count - 1
+                    Properties.Drag_GE(n * Loads(0).Altitude_GroundEffect.Count + m) = Loads(i).Drag_GroundEffect(m) / q
+                    Properties.Lift_GE(n * Loads(0).Altitude_GroundEffect.Count + m) = Loads(i).Lift_GroundEffect(m) / q
+                    Properties.AOA_GE(n * Loads(0).Altitude_GroundEffect.Count + m) = Math.Round(Loads(i).AoA, 1)
+                    Properties.Altitude_GE(n * Loads(0).Altitude_GroundEffect.Count + m) = Loads(i).Altitude_GroundEffect(m)
+                Next
                 n += 1
                 i += 1
             Loop
             If Properties.AoA.Length < 5 Then
+                Properties.DistanceScore = 1
                 Throw New ArgumentOutOfRangeException
             End If
             Select Case PolarNo
@@ -57,7 +74,10 @@ Namespace Performance
                     Properties.Cd0 = Polyonym.c1
                     Properties.k = Polyonym.a1
                     Properties.b = Polyonym.b1
-
+                    If Properties.Cd0 < 0 Then
+                        Properties.DistanceScore = 1.5
+                        Throw New ArgumentOutOfRangeException
+                    End If
                 Case Else
                     Dim Dummy(Properties.AoA.GetUpperBound(0)) As Double
                     Properties.AoA.CopyTo(Dummy, 0)
@@ -107,13 +127,16 @@ Namespace Performance
 
             AOA_unstick = 10 'rad2deg(Math.Atan(0.15 / (0.3 * Fuselage_length))) 'it is supposed that Main LG is position at 0.6*Fus_Length and we gine an exgtra 10% margin
             '0.15 is the height of LG
-            Cl = interp1d(Properties.AoA, Properties.Lift, AOA_unstick)
+            'Cl = interp1d(Properties.AoA, Properties.Lift, AOA_unstick)
+            'Vminimun_unstick = Math.Sqrt(Properties.TakeOffWeight / (0.5 * ISA.Density * (WingArea / 2) * Cl))
+            Cl = interp2d(Properties.AOA_GE, Properties.Altitude_GE, Properties.Lift_GE, AOA_unstick, 0)
             Vminimun_unstick = Math.Sqrt(Properties.TakeOffWeight / (0.5 * ISA.Density * (WingArea / 2) * Cl))
             Vrotate = Vminimun_unstick * 1.1
 
             Vinst = 0
             μ = 0.06
             Accel = 0
+            GroundEffect = True
 
         End Sub
 
@@ -128,24 +151,22 @@ Namespace Performance
             Dim Timestep As Double = 0
             Dim Lift_Inst, Cl, Cd As Double
             Dim AOA As Double = 0
-            While True 'Vrotate >= Vinst
+            Select Case GroundEffect
+                Case True
+                    Cl = interp2d(Properties.AOA_GE, Properties.Altitude_GE, Properties.Lift_GE, AOA, 0)
+                    Cd = interp2d(Properties.AOA_GE, Properties.Altitude_GE, Properties.Drag_GE, AOA, 0)
+                Case False
+                    Cl = interp1d(Properties.AoA, Properties.Lift, AOA)
+                    Cd = Properties.Cd0 + Properties.b * Cl + Properties.k * Cl ^ 2
+            End Select
+            While True
 
                 ''''
                 Dim Re As Double = Vinst * Lmac / ISA.KinematicVisc
-                'Drag_Inst = interp2d(Properties.Reynolds, Properties.AoA, Properties.Drag, Re, AOA)
-                'Lift_Inst = interp2d(Properties.Reynolds, Properties.AoA, Properties.Lift, Re, AOA)
-
-                Cl = interp1d(Properties.AoA, Properties.Lift, AOA)
                 Lift_Inst = 0.5 * ISA.Density * (WingArea / 2) * Cl * Vinst ^ 2
-
-                'If Lift_Inst > Properties.TakeOffWeight Then
-                '    Exit While
-                'End If
-
-                Cd = Properties.Cd0 + Properties.b * Cl + Properties.k * Cl ^ 2
                 Drag_Inst = 0.5 * ISA.Density * (WingArea / 2) * Cd * Vinst ^ 2
-                ''''
 
+                ''''
                 Accel = (Engine.Thrust(Vinst) - μ * (Lift_Inst - Properties.TakeOffWeight) - Drag_Inst) / (Properties.TakeOffWeight / 9.81)
                 If 1.39 <= Vinst Then ''AndAlso Enter Then ''at 1.39m/s (5km/h) the timing starts 
                     Timestep += 1
@@ -154,6 +175,7 @@ Namespace Performance
                 ''next timestep status''
                 TakeOff_Distance += Vinst * dt + 0.5 * Accel * dt ^ 2
                 If TakeOff_Distance > 60 OrElse Timestep * dt > 60 Then
+                    Properties.DistanceScore = 2
                     Throw New ArgumentOutOfRangeException
                 End If
                 Vinst += Accel * dt
@@ -172,6 +194,7 @@ Namespace Performance
             Properties.DistanceRotate = TakeOff_Distance
 
             Properties.VelocityRotate = Vinst
+            'GroundEffect = False
         End Sub
 
         Public Sub Climb(ByRef Properties As MissionProperties)
@@ -182,7 +205,7 @@ Namespace Performance
             ISA.CalculateAirProperties(Alt)
             Dim Vel, Vel1, Re, Alpha, Thrust_req, Thrust_max, SEP1, dV, SEP2, Gradient, Cl, Cd, V_old As Double
             Vel = Properties.VelocityRotate
-
+            Dim Max_Lift As Double
             Dim He As Double
             dV = 0.1
             ''find optimum Vel to start climbing (Sep=0)
@@ -193,7 +216,13 @@ Namespace Performance
                 'Thrust_req = interp2d(Properties.Reynolds, Properties.AoA, Properties.Drag, Re, Alpha)
 
                 Cl = Properties.TakeOffWeight / (0.5 * ISA.Density * (WingArea / 2) * Vel ^ 2)
-                Cd = Properties.Cd0 + Properties.b * Cl + Properties.k * Cl ^ 2
+
+                Select Case GroundEffect
+                    Case True
+                        Cd = interp2d(Properties.Altitude_GE, Properties.Lift_GE, Properties.Drag_GE, Alt, Cl)
+                    Case False
+                        Cd = Properties.Cd0 + Properties.b * Cl + Properties.k * Cl ^ 2
+                End Select
                 Thrust_req = 0.5 * ISA.Density * (WingArea / 2) * Cd * Vel ^ 2
                 ''''''
                 Thrust_max = Engine.Thrust(Vel)
@@ -205,13 +234,21 @@ Namespace Performance
                 'Alpha = interp2d(Properties.Reynolds, Properties.Lift, Properties.AoA, Re, Properties.TakeOffWeight)
                 'Thrust_req = interp2d(Properties.Reynolds, Properties.AoA, Properties.Drag, Re, Alpha)
 
-                Cl = Properties.TakeOffWeight / (0.5 * ISA.Density * (WingArea / 2) * Vel1 ^ 2)
-                Cd = Properties.Cd0 + Properties.b * Cl + Properties.k * Cl ^ 2
+                Cl = Properties.TakeOffWeight / (0.5 * ISA.Density * (WingArea / 2) * Vel ^ 2)
+
+                Select Case GroundEffect
+                    Case True
+                        Cd = interp2d(Properties.Altitude_GE, Properties.Lift_GE, Properties.Drag_GE, Alt, Cl)
+                        Max_Lift = Loads(Loads.Count - 1).Lift_GroundEffect(0)
+                    Case False
+                        Cd = Properties.Cd0 + Properties.b * Cl + Properties.k * Cl ^ 2
+                        Max_Lift = Loads(Loads.Count - 1).Lift
+                End Select
                 Thrust_req = 0.5 * ISA.Density * (WingArea / 2) * Cd * Vel1 ^ 2
                 '''''''''
                 Thrust_max = Engine.Thrust(Vel1)
                 SEP2 = (Thrust_max - Thrust_req) * Vel1 / Properties.TakeOffWeight
-                If (SEP2 - SEP1) < 0 Then
+                If (SEP2 - SEP1) < 0 And Max_Lift >= Properties.TakeOffWeight Then
                     dV /= 10
                     Continue While
                 End If
@@ -237,6 +274,9 @@ Namespace Performance
             While True
                 Alt = He - Vel ^ 2 / (2 * 9.81)
                 While True
+                    If Alt > Loads(0).Altitude_GroundEffect.Count - 1 Then
+                        GroundEffect = False
+                    End If
                     ISA.CalculateAirProperties(Alt)
                     ''''
                     'Re = Vel * Lmac / ISA.KinematicVisc
@@ -244,7 +284,13 @@ Namespace Performance
                     'Thrust_req = interp2d(Properties.Reynolds, Properties.AoA, Properties.Drag, Re, Alpha)
 
                     Cl = Properties.TakeOffWeight / (0.5 * ISA.Density * (WingArea / 2) * Vel ^ 2)
-                    Cd = Properties.Cd0 + Properties.b * Cl + Properties.k * Cl ^ 2
+
+                    Select Case GroundEffect
+                        Case True
+                            Cd = interp2d(Properties.Altitude_GE, Properties.Lift_GE, Properties.Drag_GE, Alt, Cl)
+                        Case False
+                            Cd = Properties.Cd0 + Properties.b * Cl + Properties.k * Cl ^ 2
+                    End Select
                     Thrust_req = 0.5 * ISA.Density * (WingArea / 2) * Cd * Vel ^ 2
                     ''''
                     Thrust_max = Engine.Thrust(Vel)
@@ -258,13 +304,22 @@ Namespace Performance
                     'Alpha = interp2d(Properties.Reynolds, Properties.Lift, Properties.AoA, Re, Properties.TakeOffWeight)
                     'Thrust_req = interp2d(Properties.Reynolds, Properties.AoA, Properties.Drag, Re, Alpha)
 
-                    Cl = Properties.TakeOffWeight / (0.5 * ISA.Density * (WingArea / 2) * Vel1 ^ 2)
-                    Cd = Properties.Cd0 + Properties.b * Cl + Properties.k * Cl ^ 2
+                    Cl = Properties.TakeOffWeight / (0.5 * ISA.Density * (WingArea / 2) * Vel ^ 2)
+
+                    Select Case GroundEffect
+                        Case True
+                            Cd = interp2d(Properties.Altitude_GE, Properties.Lift_GE, Properties.Drag_GE, Alt, Cl)
+                            Max_Lift = Loads(Loads.Count - 1).Lift_GroundEffect(0)
+                            Max_Lift = Properties.Lift_GE(Properties.Lift_GE.Count - Loads(0).Lift_GroundEffect.Count) * 0.5 * ISA.Density * (WingArea / 2) * Vel ^ 2
+                        Case False
+                            Cd = Properties.Cd0 + Properties.b * Cl + Properties.k * Cl ^ 2
+                            Max_Lift = Properties.Lift(Properties.Lift.GetUpperBound(0)) * 0.5 * ISA.Density * (WingArea / 2) * Vel ^ 2
+                    End Select
                     Thrust_req = 0.5 * ISA.Density * (WingArea / 2) * Cd * Vel1 ^ 2
                     ''''
                     Thrust_max = Engine.Thrust(Vel1)
                     SEP2 = (Thrust_max - Thrust_req) * Vel1 / Properties.TakeOffWeight
-                    If (SEP2 - SEP1) < 0 Then
+                    If (SEP2 - SEP1) < 0 And Max_Lift >= Properties.TakeOffWeight Then
                         dV /= 10
                         Continue While
                     End If
@@ -286,6 +341,7 @@ Namespace Performance
                 If Alt >= 107.5 OrElse (Properties.TimeRotate + Properties.TimeLiftOff + Properties.TimeCeiling) >= 60 Then
                     Exit While
                 ElseIf Double.IsInfinity(Vel) OrElse Thrust_req < 0 Then
+                    Properties.DistanceScore = 3
                     Throw New ArgumentOutOfRangeException
                 End If
 
@@ -340,6 +396,7 @@ Namespace Performance
                 Next
             Next
             If Properties.V_MAX = 0 Then
+                Properties.DistanceScore = 4
                 Throw New ArgumentOutOfRangeException
             End If
             ''find optimum cruise point =>Vmax | He=const =>T=D | SEP=0
@@ -372,6 +429,7 @@ Namespace Performance
                 If ExT < 10 ^ (-3) Then
                     Exit While
                 ElseIf Double.IsInfinity(Vel) OrElse Thrust_req < 0 Then
+                    Properties.DistanceScore = 5
                     Throw New ArgumentOutOfRangeException
                 End If
 
@@ -400,6 +458,7 @@ Namespace Performance
                 If Vel - Properties.V_MAX > 0.2 * Properties.V_MAX Then
                     Exit While
                 ElseIf Double.IsInfinity(Vel) OrElse Thrust_req < 0 Then
+                    Properties.DistanceScore = 6
                     Throw New ArgumentOutOfRangeException
                 End If
 
@@ -458,9 +517,10 @@ Namespace Performance
                     Continue While
                 End If
                 Gradient = (DESC2 - DESC1) / dV
-                If Math.Abs(Gradient) < (10 ^ (-4)) Then
+                If Math.Abs(Gradient) < (10 ^ (-4)) OrElse Alt <= 15 Then
                     Exit While
                 ElseIf Double.IsInfinity(Vel) OrElse Thrust_req < 0 Then
+                    Properties.DistanceScore = 7
                     Throw New ArgumentOutOfRangeException
                 End If
 
@@ -534,7 +594,7 @@ Namespace Performance
                         Continue While
                     End If
                     Gradient = (DESC2 - DESC1) / dV
-                    If Math.Abs(Gradient) < 10 ^ (-4) Then
+                    If Math.Abs(Gradient) < 10 ^ (-4) OrElse Alt <= 15 Then
                         Exit While
                     End If
                     dV = 0.1
@@ -545,7 +605,7 @@ Namespace Performance
                 Properties.DistanceDescentCruise += dx
                 dt = Math.Abs(dHe / SEP1)
 
-                If Alt <= 15 Or (Properties.TimeDescentCruise + Properties.TimeConstantEnergy + dt) >= 120 Then
+                If (Properties.TimeDescentCruise + Properties.TimeConstantEnergy + dt) >= 120 Then
                     Exit While
                 ElseIf Alt <= 18 AndAlso (Properties.TimeDescentCruise + Properties.TimeConstantEnergy + dt) < 120 Then
                     While True
@@ -574,6 +634,7 @@ Namespace Performance
                     Exit While
 
                 ElseIf Double.IsInfinity(Vel) OrElse Thrust_req < 0 Then
+                    Properties.DistanceScore = 8
                     Throw New ArgumentOutOfRangeException
                 End If
 

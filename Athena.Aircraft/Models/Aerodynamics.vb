@@ -23,23 +23,25 @@ Namespace Models
         Public Shared Property Include_Fuselage As Boolean
         Public Shared Property Fuselage_length As Double
         Public Shared Property Lmac As Double
+        Public Shared Property Xmac As Double
+        Public Shared Property Ymac As Double
+        Public Shared Property GroundEffect As Boolean
         Public Shared Property Loads As New List(Of AeroForces)
 
         Public Class Aerodynamics
 
             Public Sub TailDesign(ByRef score As Integer, Constrained As Boolean)
                 Try
+                    GroundEffect = False
                     FinDesign(MyProjectRoot.Model)
-                    Dim xx0 As Double = 0.3
-                    Dim xx1 As Double = 0.6
+                    Dim xx0 As Double = 0.2
+                    Dim xx1 As Double = 0.5
                     Dim Re As Double = Model.PolarDataBase.Families(0).Polars(0).Reynolds
                     Dim ISA As New StandardAtmosphere(100)
                     MAC()
                     Dim Vel As Double = Re * ISA.KinematicVisc / Lmac
-
                     CalculationCommand.set_altitude(100)
                     CalculationCommand.set_velocity(Vel, 0, 0)
-                    CalculationCommand.set_alfa(2)
                     SetTailIncidence(2, MyProjectRoot.Model)
                     Dim f0 As Double = TailSize(xx0, Constrained)
                     Dim f1 As Double = TailSize(xx1, Constrained)
@@ -115,12 +117,29 @@ Namespace Models
 
             Public Function TailSize(Length As Double, Constrained As Boolean)
                 SetTailLength(Length, MyProjectRoot.Model, Constrained)
-                Dim solver As New Solver
-                'Steady(solver)
-                MyProjectRoot.StartCalculation(Settings.CalculationType.SteadyState, solver)
-                Dim aeroforces As New AeroForces
-                aeroforces.Calculate(solver)
-                Return StaticMargin(0.4, 0.2, aeroforces.R.X)
+                Dim i As Integer = 1
+                Dim Cz(1), Cm(1) As Double
+                Dim a = New Double() {2, 6}
+                Dim RandomPoint As Double = 0.15 'MAC percentage
+                Do While i < 3
+                    Dim solver As New Solver
+                    CalculationCommand.set_alfa(a(i - 1))
+                    MyProjectRoot.StartCalculation(Settings.CalculationType.SteadyState, Solver)
+                    Dim aeroforces As New AeroForces
+                    Dim Area = Athena.Aircraft.Models.Design.Structural.SurfaceArea(Solver)
+                    aeroforces.Surface = Area.Sw / 2
+                    aeroforces.R.X = Xmac + RandomPoint * Lmac
+                    aeroforces.Calculate(solver)
+                    'a(i - 1) = a(i)
+                    Cz(i - 1) = aeroforces.Cf.Z
+                    Cm(i - 1) = aeroforces.Cm.Y
+                    i += 1
+                Loop
+                Dim Cma = (Cm(1) - Cm(0)) / (a(1) - a(0))
+                Dim Cza = (Cz(1) - Cz(0)) / (a(1) - a(0))
+                Dim NeutralPoint As Double = Xmac + (RandomPoint - Cma / Cza) * Lmac
+
+                Return StaticMargin(0.4, 0.1, NeutralPoint)
             End Function
 
             Private Sub SetTailLength(Lenght As Double, ByRef Model As DesignModel, Constrained As Boolean)
@@ -209,7 +228,7 @@ Namespace Models
             Public Function CheckLength(root As Double, f0 As Double, f1 As Double, Constrained As Boolean) As (fr As Double, Cancel As Boolean)
                 Dim fr As Double
                 Dim Cancel As Boolean
-                If root <= 0 Then
+                If root <= 0 Or root >= 0.5 Then
                     If f0 < 0 AndAlso f1 < 0 Then
                         Cancel = True
                         fr = 0
@@ -231,9 +250,7 @@ Namespace Models
                 End If
             End Function
 
-            Private Shared Function MAC() As (Xmac As Double, Ymac As Double, Lmac As Double)
-                Dim Xmac As Double
-                Dim Ymac As Double
+            Private Shared Function MAC()
                 For Each Surface As Surface In MyProjectRoot.Model.Objects
                     If Surface.Id = MainWingID Then
                         Dim wing As LiftingSurface = Surface
@@ -252,37 +269,48 @@ Namespace Models
                         Next
                     End If
                 Next
-                Return (Xmac, Ymac, Lmac)
+                'Return (Xmac, Ymac, Lmac)
             End Function
 
             Public Shared Function StaticMargin(distance As Double, MACper As Double, RefPoint As Double) As Double
-                Dim chord = MAC()
-                Dim Xcg As Double = chord.Xmac + distance * chord.Lmac
+                Dim Xcg As Double = Xmac + distance * Lmac
                 Dim margin As Double = RefPoint - Xcg
-                Dim per As Double = MACper * chord.Lmac
+                Dim per As Double = MACper * Lmac
                 Dim SM As Double = margin - per
                 Return SM
             End Function
 
-            Public Function CheckDeflection(root As Double, g0 As Double, g1 As Double) As (defl As Double, Cancel As Boolean, Forces As AeroForces)
+            Public Function CheckDeflection(root As Double, g0 As Double, g1 As Double, xx0 As Double, xx1 As Double) As (defl As Double, Cancel As Boolean, Forces As AeroForces)
                 Dim defl As Double
                 Dim Cancel As Boolean
 
-                If root < -60 Or root > 60 Then
+                If root < -20 Or root > 20 Then
+                    Dim aeroforces As New AeroForces
                     If g0 > 0.01 AndAlso g1 > 0.01 Then
                         Cancel = True
                         defl = 0
                     Else
                         If g1 < 0.01 Then
-                            defl = g1
+                            SetTailIncidence(xx1, MyProjectRoot.Model)
+                            Dim solver As New Solver
+                            Steady(solver)
+                            aeroforces.Calculate(solver)
+                            defl = StaticMargin(0.2, 0, AeroForces.CP.X)
+                            'defl = g1
                             Cancel = False
                         End If
                         If g0 < 0.01 AndAlso g1 > 0.01 Then
+                            SetTailIncidence(xx0, MyProjectRoot.Model)
+                            Dim solver As New Solver
+
+                            Steady(solver)
+                            aeroforces.Calculate(solver)
+                            defl = StaticMargin(0.2, 0, AeroForces.CP.X)
                             defl = g0
                             Cancel = False
                         End If
                     End If
-                    Return (defl, Cancel, Nothing)
+                    Return (defl, Cancel, aeroforces)
                 ElseIf Double.IsNaN(root) Or Double.IsNaN(g0) Or Double.IsNaN(g1) Then
                     Cancel = True
                     Return (Nothing, Cancel, Nothing)
@@ -292,7 +320,7 @@ Namespace Models
                     Dim aeroforces As New AeroForces
                     Steady(solver)
                     aeroforces.Calculate(solver)
-                    defl = StaticMargin(0.2, 0, aeroforces.R.X)
+                    defl = StaticMargin(0.2, 0, aeroforces.CP.X)
                     Cancel = False
                     Return (defl, Cancel, aeroforces)
                 End If

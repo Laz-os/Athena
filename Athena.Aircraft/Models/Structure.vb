@@ -25,7 +25,12 @@
                 Sw = 4 * Solver.Lattices(WingRank).AirLoads.Area
                 Sr = 2 * Solver.Lattices(RudderRank).AirLoads.Area
                 Se = 4 * Solver.Lattices(ElevatorRank).AirLoads.Area
-                Sfus = Solver.Lattices(FuselageRank).AirLoads.Area
+                If FuselageRank <= Solver.Lattices.Count - 1 Then
+                    Sfus = Solver.Lattices(FuselageRank).AirLoads.Area
+                Else
+                    Sfus = 0
+                End If
+
                 Return (Sw, Sr, Se, Sfus)
             End Function
 

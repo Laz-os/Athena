@@ -6,6 +6,7 @@ Imports Athena.Aircraft.Models.Design
 Imports Athena.Aircraft.Models.Design.Aerodynamics
 Imports Athena.Functions.Functions
 Imports OpenVOGEL.DesignTools.VisualModel.Models.Components.Basics
+Imports OpenVOGEL.DesignTools.VisualModel.Models.Components
 
 Namespace Performance
     Public Module Analysis
@@ -34,7 +35,7 @@ Namespace Performance
                 End If
             Next
 
-            AlfaScan(-3, 10.6, 1.5, Vel, Re)
+            AlfaScan(-2, 10, 1, Vel, Re)
 
         End Sub
 
@@ -50,6 +51,7 @@ Namespace Performance
 
             Dim N As Integer = (Alfa2 - Alfa1) / AlfaS
             Dim first_run As Boolean = True
+
             For I = 0 To N
                 Try
                     Dim Alfa = deg2rad(Math.Min(Alfa1 + I * AlfaS, Alfa2))
@@ -57,12 +59,12 @@ Namespace Performance
 
                     Dim aeroforces As New AeroForces
                     Dim solver As New Solver
-                    Dim xx0 As Double = -15
+                    Dim xx0 As Double = -10
                     Dim Aero As New Aerodynamics
                     Aero.SetTailIncidence(xx0, MyProjectRoot.Model)
                     Steady(solver)
                     aeroforces.Calculate(solver)
-                    Dim g0 As Double = StaticMargin(0.2, 0, aeroforces.R.X)
+                    Dim g0 As Double = StaticMargin(0.2, 0, aeroforces.CP.X)
 
                     If first_run Then
                         Dim Area = Athena.Aircraft.Models.Design.Structural.SurfaceArea(solver)
@@ -78,21 +80,22 @@ Namespace Performance
                         Next
                         I += -1
                         first_run = False
+                        GroundEffect = True
                         Continue For
                     End If
 
                     Dim aeroforces1 As New AeroForces
                     Dim solver1 As New Solver
-                    Dim xx1 As Double = 15
+                    Dim xx1 As Double = 10
                     Aero = New Aerodynamics
                     Aero.SetTailIncidence(xx1, MyProjectRoot.Model)
                     Steady(solver1)
                     aeroforces1.Calculate(solver1)
-                    Dim g1 As Double = StaticMargin(0.2, 0, aeroforces1.R.X)
+                    Dim g1 As Double = StaticMargin(0.2, 0, aeroforces1.CP.X)
 
                     Dim root As Double = xx1 - g1 * (xx1 - xx0) / (g1 - g0)
                     Aero = New Aerodynamics
-                    Dim CheckDef = Aero.CheckDeflection(root, g0, g1)
+                    Dim CheckDef = Aero.CheckDeflection(root, g0, g1, xx0, xx1)
                     If CheckDef.Cancel Then
                         Continue For
                     End If
@@ -103,7 +106,7 @@ Namespace Performance
                         g1 = CheckDef.defl
                         root = xx1 - g1 * (xx1 - xx0) / (g1 - g0)
                         Aero = New Aerodynamics
-                        CheckDef = Aero.CheckDeflection(root, g0, g1)
+                        CheckDef = Aero.CheckDeflection(root, g0, g1, xx0, xx1)
                         If CheckDef.Cancel Then
                             Continue For
                         End If
@@ -848,18 +851,21 @@ Namespace Performance
         Public Property Airloads As New OpenVOGEL.AeroTools.CalculationModel.Models.Aero.AirLoads
         Public Property AoA As Double
         Public Property Beta As Double
-        Public Property Fx As Double
-        Public Property Fy As Double
-        Public Property Fz As Double
+        Public Property F As New Vector3
+        Public Property Cf As New Vector3 'body force coefficients
         Public Property Lift As Double
         Public Property Drag As Double
+        Public Property Altitude_GroundEffect() As Double() = New Double(19) {}
+        Public Property Lift_GroundEffect() As Double() = New Double(19) {}
+        Public Property Drag_GroundEffect() As Double() = New Double(19) {}
         Public Property Sideforce As Double
-        Public Property Mx As Double
-        Public Property My As Double
-        Public Property Mz As Double
-        Public Property R As New Vector3
+        Public Property M As New Vector3
+        Public Property Cm As New Vector3 'body moment coefficients
+        Public Property R As New Vector3 'Reference Point
+        Public Property CP As New Vector3 'Center of Pressure
         Public Property Re As Double
         Public Property Deflection As Double
+        Public Property Surface As Double = 0
         Public Sub Calculate(_CalculationCore As Solver)
 
             Dim TotalForce As New Vector3
@@ -882,7 +888,6 @@ Namespace Performance
             TotalForce.Add(Airloads.SkinDragForce)
 
             TotalForce.Add(Airloads.BodyForce)
-            'TotalForce.Scale(q)
 
             TotalMoment.SetToCero()
 
@@ -894,49 +899,50 @@ Namespace Performance
 
             TotalMoment.Add(Airloads.BodyMoment)
 
-            'TotalMoment.Scale(q)
+#Region "Center of Pressure"
 
-            'declare the reference point for Moment calculation
-            R.X = 0
-            R.Y = 0
-            R.Z = 0
+            CP.X = 0
+            CP.Y = 0
+            CP.Z = 0
 
-            TotalMoment.AddCrossProduct(TotalForce, R)
+            TotalMoment.AddCrossProduct(TotalForce, CP)
 
-#Region "Reference Point"
             Dim MomT As String
 
             If TotalMoment.Y < 0 Then
+
                 MomT = "Negative"
             ElseIf TotalMoment.Y > 0 Then
+
                 MomT = "Positive"
             End If
 
             Dim stp As Double = 1
             Dim dist As Double = 0
+
             For i As Double = 0 To 100 Step stp
                 TotalMoment.SetToCero()
                 TotalMoment.Add(Airloads.LiftMoment)
                 TotalMoment.Add(Airloads.InducedDragMoment)
                 TotalMoment.Add(Airloads.SkinDragMoment)
                 TotalMoment.Add(Airloads.BodyMoment)
-                R.X += stp '+ temp   
-                TotalMoment.AddCrossProduct(TotalForce, R)
+                CP.X += stp '+ temp   
+                TotalMoment.AddCrossProduct(TotalForce, CP)
                 Select Case MomT
                     Case "Negative"
                         If TotalMoment.Y < 0 Then
-                            dist = R.X
+                            dist = CP.X
                         ElseIf TotalMoment.Y > 0.001 Then
-                            R.X = dist
+                            CP.X = dist
                             stp /= 10
                         Else Exit For
 
                         End If
                     Case "Positive"
                         If TotalMoment.Y > 0 Then
-                            dist = R.X
+                            dist = CP.X
                         ElseIf TotalMoment.Y < 0.001 Then
-                            R.X = dist
+                            CP.X = dist
                             stp /= 10
                         Else Exit For
 
@@ -945,23 +951,42 @@ Namespace Performance
             Next
 #End Region
 
-            Fx = TotalForce.X
-            Fy = TotalForce.Y
-            Fz = TotalForce.Z
+            F.X = TotalForce.X
+            F.Y = TotalForce.Y
+            F.Z = TotalForce.Z
 
-            Mx = TotalMoment.X
-            My = TotalMoment.Y
-            Mz = TotalMoment.Z
+            TotalMoment.SetToCero()
+            TotalMoment.Add(Airloads.LiftMoment)
+            TotalMoment.Add(Airloads.InducedDragMoment)
+            TotalMoment.Add(Airloads.SkinDragMoment)
+            TotalMoment.Add(Airloads.BodyMoment)
+
+            R.Y = 0
+            R.Z = 0
+
+            TotalMoment.AddCrossProduct(TotalForce, R)
+
+            M.X = TotalMoment.X
+            M.Y = TotalMoment.Y
+            M.Z = TotalMoment.Z
 
             ' Dimensionless
 
-            Dim S As Double = Math.Max(0.001, 0) ''edw mporw na allaksw to miden me epifania anaforaw gia na exv adiastatous syntelestes
+            Dim S As Double = Math.Max(0.001, Surface) ''edw mporw na allaksw to miden me epifania anaforaw gia na exv adiastatous syntelestes
 
-            Dim c As Double = Math.Max(0.001, 0)
+            Dim c As Double = Math.Max(0.001, Lmac)
 
             Dim qS As Double = q * S
 
             Dim qSc As Double = q * S * c
+
+            Cf.X = TotalForce.X / qS
+            Cf.Y = TotalForce.Y / qS
+            Cf.Z = TotalForce.Z / qS
+
+            Cm.X = TotalMoment.X / qSc
+            Cm.Y = TotalMoment.Y / qSc
+            Cm.Z = TotalMoment.Z / qSc
 
             ' Components in aerodynamic coordinates
 
@@ -988,6 +1013,137 @@ Namespace Performance
 
             AoA = (Math.Asin(_CalculationCore.StreamVelocity.Z / _CalculationCore.StreamVelocity.Norm2)) / Math.PI * 180
             Beta = Math.Asin(_CalculationCore.StreamVelocity.Y / _CalculationCore.StreamVelocity.Norm2) / Math.PI * 180
+
+#Region "Ground Effect"
+
+
+            If GroundEffect = True Then
+
+
+                Dim PosY, Rt_w, Ra_w, Dl_w, Dd_w, wingspan, Alt, Rt_e, Ra_e, Dl_e, Dd_e, span As Double
+                Dim Wing, Elevator As LiftingSurface
+                For Each Surface As Surface In Model.Objects
+                    If Surface.Id = MainWingID Then
+                        Wing = Surface
+                        PosY = Surface.Position.Y
+                        For Each WingRegion As WingRegion In Wing.WingRegions
+                            wingspan = 2 * Math.Cos(deg2rad(WingRegion.Dihedral)) * WingRegion.Length + 2 * PosY
+                            Rt_w = WingRegion.TipChord / Wing.RootChord
+                            Ra_w = wingspan ^ 2 / WingArea
+                        Next
+                    ElseIf Surface.Id = ElevatorID Then
+                        Elevator = Surface
+                        PosY = Surface.Position.Y
+                        For Each WingRegion As WingRegion In Elevator.WingRegions
+                            span = 2 * Math.Cos(deg2rad(WingRegion.Dihedral)) * WingRegion.Length + 2 * PosY
+                            Rt_e = WingRegion.TipChord / Elevator.RootChord
+                            Ra_e = span ^ 2 / ElevatorArea
+                        Next
+                    End If
+                Next
+                Dl_e = 1 - 2.25 * (Rt_e ^ 0.00273 - 0.997) * (Ra_e ^ 0.717 + 13.6)
+                Dd_e = 1 - 0.157 * (Rt_e ^ 0.775 - 0.373) * (Ra_e ^ 0.417 - 1.27)
+                Dim Cd_Cl2_e = _CalculationCore.Lattices(ElevatorRank).AirLoads.InducedDragCoefficient / (_CalculationCore.Lattices(ElevatorRank).AirLoads.LiftCoefficient ^ 2)
+                Dl_w = 1 - 2.25 * (Rt_w ^ 0.00273 - 0.997) * (Ra_w ^ 0.717 + 13.6)
+                Dd_w = 1 - 0.157 * (Rt_w ^ 0.775 - 0.373) * (Ra_w ^ 0.417 - 1.27)
+                Dim Cd_Cl2_w = _CalculationCore.Lattices(WingRank).AirLoads.InducedDragCoefficient / (_CalculationCore.Lattices(WingRank).AirLoads.LiftCoefficient ^ 2)
+                'Dim Angle1_e = (Math.Asin(_CalculationCore.Lattices(ElevatorRank).AirLoads.LiftForce.Z / _CalculationCore.Lattices(ElevatorRank).AirLoads.LiftForce.Norm2)) / Math.PI * 180
+                'Dim Angle2_e = (Math.Acos(_CalculationCore.Lattices(ElevatorRank).AirLoads.LiftForce.X / _CalculationCore.Lattices(ElevatorRank).AirLoads.LiftForce.Norm2)) / Math.PI * 180
+                Dim LiftNorm_e = _CalculationCore.Lattices(ElevatorRank).AirLoads.LiftForce.Norm2
+                Dim LiftZ_e = _CalculationCore.Lattices(ElevatorRank).AirLoads.LiftForce.Z
+                Dim LiftX_e = _CalculationCore.Lattices(ElevatorRank).AirLoads.LiftForce.X
+                'Dim Angle3_e = (Math.Asin(_CalculationCore.Lattices(ElevatorRank).AirLoads.InducedDragForce.Z / _CalculationCore.Lattices(ElevatorRank).AirLoads.InducedDragForce.Norm2)) / Math.PI * 180
+                'Dim Angle4_e = (Math.Acos(_CalculationCore.Lattices(ElevatorRank).AirLoads.InducedDragForce.X / _CalculationCore.Lattices(ElevatorRank).AirLoads.InducedDragForce.Norm2)) / Math.PI * 180
+                Dim DragNorm_e = _CalculationCore.Lattices(ElevatorRank).AirLoads.InducedDragForce.Norm2
+                Dim DragZ_e = _CalculationCore.Lattices(ElevatorRank).AirLoads.InducedDragForce.Z
+                Dim DragX_e = _CalculationCore.Lattices(ElevatorRank).AirLoads.InducedDragForce.X
+                'Dim Angle1_w = (Math.Asin(_CalculationCore.Lattices(WingRank).AirLoads.LiftForce.Z / _CalculationCore.Lattices(WingRank).AirLoads.LiftForce.Norm2)) / Math.PI * 180
+                'Dim Angle2_w = (Math.Acos(_CalculationCore.Lattices(WingRank).AirLoads.LiftForce.X / _CalculationCore.Lattices(WingRank).AirLoads.LiftForce.Norm2)) / Math.PI * 180
+                Dim LiftNorm_w = _CalculationCore.Lattices(WingRank).AirLoads.LiftForce.Norm2
+                Dim LiftZ_w = _CalculationCore.Lattices(WingRank).AirLoads.LiftForce.Z
+                Dim LiftX_w = _CalculationCore.Lattices(WingRank).AirLoads.LiftForce.X
+                'Dim Angle3_w = (Math.Asin(_CalculationCore.Lattices(WingRank).AirLoads.InducedDragForce.Z / _CalculationCore.Lattices(WingRank).AirLoads.InducedDragForce.Norm2)) / Math.PI * 180
+                'Dim Angle4_w = (Math.Acos(_CalculationCore.Lattices(WingRank).AirLoads.InducedDragForce.X / _CalculationCore.Lattices(WingRank).AirLoads.InducedDragForce.Norm2)) / Math.PI * 180
+                Dim DragNorm_w = _CalculationCore.Lattices(WingRank).AirLoads.InducedDragForce.Norm2
+                Dim DragZ_w = _CalculationCore.Lattices(WingRank).AirLoads.InducedDragForce.Z
+                Dim DragX_w = _CalculationCore.Lattices(WingRank).AirLoads.InducedDragForce.X
+
+
+                For N = 1 To 20
+                    Alt = (N / 10) * wingspan
+                    Dim Hr_e = Alt / span
+
+                    Dim Cl_ge = (1 + Dl_e * (288 * Hr_e ^ 0.787 * Math.Exp(-9.14 * Hr_e ^ 0.327)) / (Ra_e ^ 0.882)) * _CalculationCore.Lattices(ElevatorRank).AirLoads.LiftCoefficient
+                    Dim LiftForce_new_e = Cl_ge * _CalculationCore.StreamDynamicPressure * _CalculationCore.Lattices(ElevatorRank).AirLoads.Area
+                    _CalculationCore.Lattices(ElevatorRank).AirLoads.LiftForce.Z = LiftForce_new_e * LiftZ_e / LiftNorm_e '* Math.Sin(deg2rad(Angle1_e))
+                    _CalculationCore.Lattices(ElevatorRank).AirLoads.LiftForce.X = LiftForce_new_e * LiftX_e / LiftNorm_e ' * Math.Cos(deg2rad(Angle2_e))
+
+                    Dim Cdi_ge = (1 - Dd_e * Math.Exp(-4.74 * Hr_e ^ 0.814) - Hr_e ^ 2 * Math.Exp(-3.88 * Hr_e ^ 0.758)) * Cd_Cl2_e * (Cl_ge ^ 2)
+                    Dim InducedForce_new_e = Cdi_ge * _CalculationCore.StreamDynamicPressure * _CalculationCore.Lattices(ElevatorRank).AirLoads.Area
+                    _CalculationCore.Lattices(ElevatorRank).AirLoads.InducedDragForce.Z = InducedForce_new_e * DragZ_e / DragNorm_e ' * Math.Sin(deg2rad(Angle3_e))
+                    _CalculationCore.Lattices(ElevatorRank).AirLoads.InducedDragForce.X = InducedForce_new_e * DragX_e / DragNorm_e ' * Math.Cos(deg2rad(Angle4_e))
+
+                    Dim Hr_w = Alt / wingspan
+                    Cl_ge = (1 + Dl_w * (288 * Hr_w ^ 0.787 * Math.Exp(-9.14 * Hr_w ^ 0.327)) / (Ra_w ^ 0.882)) * _CalculationCore.Lattices(WingRank).AirLoads.LiftCoefficient
+                    Dim LiftForce_new_w = Cl_ge * _CalculationCore.StreamDynamicPressure * _CalculationCore.Lattices(WingRank).AirLoads.Area
+                    _CalculationCore.Lattices(WingRank).AirLoads.LiftForce.Z = LiftForce_new_w * LiftZ_w / LiftNorm_w  ' * Math.Sin(deg2rad(Angle1_w))
+                    _CalculationCore.Lattices(WingRank).AirLoads.LiftForce.X = LiftForce_new_w * LiftX_w / LiftNorm_w ' * Math.Cos(deg2rad(Angle2_w))
+
+
+                    Cdi_ge = (1 - Dd_w * Math.Exp(-4.74 * Hr_w ^ 0.814) - Hr_w ^ 2 * Math.Exp(-3.88 * Hr_w ^ 0.758)) * Cd_Cl2_w * (Cl_ge ^ 2)
+                    Dim InducedForce_new_w = Cdi_ge * _CalculationCore.StreamDynamicPressure * _CalculationCore.Lattices(WingRank).AirLoads.Area
+                    _CalculationCore.Lattices(WingRank).AirLoads.InducedDragForce.Z = InducedForce_new_w * DragZ_w / DragNorm_w ' * Math.Sin(deg2rad(Angle3_w))
+                    _CalculationCore.Lattices(WingRank).AirLoads.InducedDragForce.X = InducedForce_new_w * DragX_w / DragNorm_w '* Math.Cos(deg2rad(Angle4_w))
+
+                    'y = Cl_ge / _CalculationCore.Lattices(WingRank).AirLoads.LiftCoefficient
+                    'x = (Cdi_ge / (Cl_ge ^ 2)) / Cd_Cl2_w
+
+                    Airloads.Clear()
+                    For i = 0 To _CalculationCore.Lattices.Count - 1
+
+                        Airloads.Add(_CalculationCore.Lattices(i).AirLoads)
+
+                    Next
+
+                    TotalForce.SetToCero()
+
+                    TotalForce.Add(Airloads.LiftForce)
+
+                    TotalForce.Add(Airloads.InducedDragForce)
+
+                    TotalForce.Add(Airloads.SkinDragForce)
+
+                    TotalForce.Add(Airloads.BodyForce)
+
+
+                    ' Components in aerodynamic coordinates
+
+                    Dim Basis1 As New Base3
+
+                    Basis1.U.X = _CalculationCore.StreamVelocity.X
+                    Basis1.U.Y = _CalculationCore.StreamVelocity.Y
+                    Basis1.U.Z = _CalculationCore.StreamVelocity.Z
+                    Basis1.U.Normalize()
+
+                    Basis1.W.X = Basis1.U.X
+                    Basis1.W.Z = Basis1.U.Z
+                    Dim Ux1 As Double = Basis1.W.X
+                    Dim Uz1 As Double = Basis1.W.Z
+                    Basis1.W.Z = Ux1
+                    Basis1.W.X = -Uz1
+                    Basis1.W.Normalize()
+
+                    Basis1.V.FromVectorProduct(Basis1.W, Basis1.U)
+
+                    Lift_GroundEffect(N - 1) = TotalForce.InnerProduct(Basis1.W)
+                    Drag_GroundEffect(N - 1) = TotalForce.InnerProduct(Basis1.U)
+                    Altitude_GroundEffect(N - 1) = Alt
+
+                Next
+            End If
+#End Region
+
+
         End Sub
     End Class
 

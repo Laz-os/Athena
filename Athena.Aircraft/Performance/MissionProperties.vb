@@ -44,9 +44,14 @@ Namespace Performance
             Public Property TakeOffWeight As Double
             Public Property Drag As Double() = New Double() {}
             Public Property Lift As Double() = New Double() {}
+            Public Property AOA_GE As Double() = New Double() {}
+            Public Property Altitude_GE As Double() = New Double() {}
+            Public Property Drag_GE As Double() = New Double() {}
+            Public Property Lift_GE As Double() = New Double() {}
             Public Property Reynolds As Double() = New Double() {}
             Public Property AoA As Double() = New Double() {}
             Public Property Elevator_Deflection As Double() = New Double() {}
+
 
             ''polar coefficients
             Public Property Cd0 As Double

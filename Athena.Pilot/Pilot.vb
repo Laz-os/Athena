@@ -42,7 +42,7 @@ Public Module Pilot
         End If
         Aero.TailDesign(score, Constrained)
         If score = 1 Then
-            Return (0, 0, 0, 5, True)
+            Return (0, 0, 0, 10, True)
         End If
         Loads.Clear()
 #End Region
@@ -69,7 +69,7 @@ Public Module Pilot
             Mission.ConstantEnergyCruise(Properties)
             Mission.DescentCruise(Properties)
         Catch ex As ArgumentOutOfRangeException
-            Return (0, 0, 0, 10, True)
+            Return (0, 0, 0, Properties.DistanceScore, True)
         End Try
         Return (Properties.DistanceScore, Payload, Properties.AltitudeScore, Properties.TakeOffBonus, False)
     End Function

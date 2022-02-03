@@ -59,18 +59,21 @@ Public Class Genetic
                     End If
                 End If
                 FpopTemp(k - 1, 0) = Sround.DistanceScore
-                    FpopTemp(k - 1, 1) = Sround.PayloadScore
-                    FpopTemp(k - 1, 2) = Sround.AltitudeScore
-                    FpopTemp(k - 1, 3) = Sround.TakeOffBonus
-                    FpopTemp(k - 1, 4) = Sround.Failed
+                FpopTemp(k - 1, 1) = Sround.PayloadScore
+                FpopTemp(k - 1, 2) = Sround.AltitudeScore
+                FpopTemp(k - 1, 3) = Sround.TakeOffBonus
+                FpopTemp(k - 1, 4) = Sround.Failed
 
             Next
+            ReDim Preserve FpopTemp(Npop - 1, 5)
             For k = 1 To Npop - Nelite2
                 Select Case FpopTemp(k - 1, 4)
                     Case False
                         Fpop(k - 1) = (1000 * (FpopTemp(k - 1, 0) / DistanceBest + FpopTemp(k - 1, 1) / PayloadBest + FpopTemp(k - 1, 2) / AltitudeBest) / 3) * FpopTemp(k - 1, 3)
+                        FpopTemp(k - 1, 5) = (1000 * (FpopTemp(k - 1, 0) / DistanceBest + FpopTemp(k - 1, 1) / PayloadBest + FpopTemp(k - 1, 2) / AltitudeBest) / 3) * FpopTemp(k - 1, 3)
                     Case True
                         Fpop(k - 1) = FpopTemp(k - 1, 3)
+                        FpopTemp(k - 1, 5) = FpopTemp(k - 1, 3)
                 End Select
             Next
 
@@ -80,7 +83,8 @@ Public Class Genetic
             For m = 1 To Npop
                 XFpop(m - 1, Nvar) = Fpop(m - 1)
             Next
-            XFpop = SortThisArray(XFpop, Nvar, -1, False) '
+            XFpop = SortThisArray(XFpop, Nvar, -1, False)
+            FpopTemp = SortThisArray(FpopTemp, 5, -1, False)
             For m = 1 To Npop
                 For j = 1 To Nvar + 1
                     If j = Nvar + 1 Then
@@ -97,7 +101,7 @@ Public Class Genetic
             For j = 1 To Nvar
                 XGbest(j - 1) = Xpop(Npop - 1, j - 1) * (Xmax(j - 1) - Xmin(j - 1)) + Xmin(j - 1)
                 If j = (AirfoilIndex + 1) AndAlso AirfoilUse Then
-                    XGbest(j - 1) = Math.Round(XGbest(j - 1))
+                    XGbest(j - 1) = Math.Floor(XGbest(j - 1))
                 End If
             Next
             Dim Xpop2(,) As Double = Xpop
