@@ -146,7 +146,7 @@ Namespace Models
                 Select Case Constrained
                     Case True
 
-                        Dim L, PosY As Double
+                        Dim L, PosY, WingPosX, Ct, span As Double
                         Dim Elevator As LiftingSurface
 
                         For Each Surface As Surface In Model.Objects
@@ -157,7 +157,51 @@ Namespace Models
                                 L = fuselage.CrossSections(NumSections - 1).Z
                             End If
                         Next
-                        Dim phi As Double = Math.Acos(L / 3)
+
+                        Dim FuselageDefined As Boolean = True
+                        Dim WingDefined As Boolean = True
+                        For Each Surface As Surface In Model.Objects
+                            If Surface.Id = MainWingID Then
+                                Dim LiftingSurface As LiftingSurface = Surface
+                                WingPosX = LiftingSurface.Position.X
+                                Ct = LiftingSurface.WingRegions(0).TipChord
+
+                                Dim phi As Double = Math.Acos(L / 3)
+                                Dim S As Double = 0.5 * Ct / Math.Tan(90 - phi)
+                                Dim MaxSpan As Double
+                                If WingPosX <= (L / 2) Then
+                                    MaxSpan = Math.Tan(phi) * WingPosX - 0.053 - S
+                                Else
+                                    MaxSpan = Math.Tan(phi) * (L - WingPosX) - 0.053 - S
+                                End If
+                                If LiftingSurface.WingRegions(0).Length > MaxSpan Then
+                                    FuselageDefined = False
+                                End If
+
+                                span = LiftingSurface.WingRegions(0).Length + 0.053 + S
+                                Dim alpha As Double = Math.Acos(span / 1.5)
+                                ' !!! maxL refers to HALF FUSELAGE LENGTH !!!
+                                Dim maxL As Double = Math.Tan(alpha) * span
+                                Dim FrontHalf As Double = WingPosX 'Distance the wing has from fuselage tip
+                                Dim AftHalf As Double = L - WingPosX
+
+                                If FrontHalf > maxL Then
+                                    WingDefined = False
+                                End If
+                                If AftHalf > maxL Then
+                                    WingDefined = False
+                                End If
+
+                            End If
+                        Next
+                        Dim TEsweep As Double
+                        Select Case True
+                            Case FuselageDefined
+                                TEsweep = Math.Acos(L / 3)
+                            Case WingDefined
+                                TEsweep = Math.PI / 2 - Math.Acos(span / 1.5)
+                        End Select
+
                         For Each Surface As Surface In Model.Objects
                             If Surface.Id = ElevatorID Then
                                 Elevator = Surface
@@ -166,7 +210,7 @@ Namespace Models
                                     WingRegion.Length = Lenght
                                     WingRegion.Sweepback = 0
                                     WingRegion.TipChord = 0.03
-                                    Elevator.RootChord = 0.03 + (Lenght / Math.Tan(phi))
+                                    Elevator.RootChord = 0.03 + (Lenght / Math.Tan(TEsweep))
                                     Elevator.Position.X = L - Elevator.RootChord - 0.05
                                 Next
                                 Elevator.GenerateMesh()
@@ -335,7 +379,7 @@ Namespace Models
                         NumSections = fuselage.CrossSections.Count
                         Dim differnce As Double = MaxLength - fuselage.CrossSections(NumSections - 1).Z
 
-                        For i = Math.Floor(fuselage.CrossSections.Count / 2 - 1) To fuselage.CrossSections.Count - 1
+                        For i = Math.Floor(fuselage.CrossSections.Count / 2) To fuselage.CrossSections.Count - 1
                             fuselage.CrossSections(i).Z += differnce
                         Next
                         fuselage.GenerateMesh()

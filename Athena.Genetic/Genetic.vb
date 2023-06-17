@@ -1,8 +1,8 @@
 ﻿Imports Athena.Functions.Functions
+Imports Microsoft.Office.Interop
 
 Public Class Genetic
 
-    Public Property XGbest As Double() = New Double() {}
     Public Property Ngen As Integer
     Public Property Npop As Integer
     Public Property Nelite As Integer
@@ -16,27 +16,72 @@ Public Class Genetic
 
     Delegate Function Fnc(X As Array, Y As Boolean) As (DistanceScore As Double, PayloadScore As Double, AltitudeScore As Double, TakeOffBonus As Double, Failed As Boolean)
 
-    Public Sub GenAl(ByRef Eval As Fnc, Constrained As Boolean)
+    Public Function GenAl(ByRef Eval As Fnc, Constrained As Boolean)
         Randomize()
         Dim Xpop(Npop - 1, Nvar - 1) As Double
-        For i = 1 To Npop
-            For j = 1 To Nvar
-                Do
-                    Xpop(i - 1, j - 1) = Rnd()
-                Loop Until Xpop(i - 1, j - 1) > 0
-            Next
-        Next
         Dim Fpop(Npop - 1) As Double
-        Dim FpopTemp(Npop - 1, 4) As Double
+        Dim FpopTemp(Npop - 1, 5) As Double
         Dim Nelite2 As Integer = 0
         Dim XFpop(,) As Double = New Double(,) {}
-        Dim Gbest As Double
+        Dim Gbest(Ngen - 1, Nvar - 1) As Double
+        Dim Fbest(Ngen - 1, 3)
+        Dim DistanceBest, PayloadBest, AltitudeBest As Double
+        DistanceBest = 0
+        AltitudeBest = 0
+        PayloadBest = 0
+
+
+        Dim initialised As Boolean = True 'SET TRUE when an initialised population is to be inserted
+        Select Case initialised
+            Case True
+                Dim xlApp As Excel.Application = New Excel.Application
+                Dim xlWorkBook As Excel.Workbook = xlApp.Workbooks.Open("C:\Users\Laz-os\Desktop\New Data 1.xlsx")
+                Dim xlWorkSheet As Excel.Worksheet = xlWorkBook.Worksheets("Sheet8")
+                ReDim Xpop(Npop - 1, Nvar - 1)
+                ReDim Fpop(Npop - 1)
+                Dim count As Integer = 0
+                For i = 1 To Npop
+
+                    For j = 1 To Nvar
+                        count += 1
+                        Xpop(i - 1, j - 1) = xlWorkSheet.Range("C" & count).Value
+                    Next
+                    count += 1
+
+                    FpopTemp(i - 1, 0) = xlWorkSheet.Range("E" & (i - 1) * 6 + 1).Value
+                    If FpopTemp(i - 1, 0) > DistanceBest Then
+                        DistanceBest = FpopTemp(i - 1, 0)
+                    End If
+                    FpopTemp(i - 1, 1) = xlWorkSheet.Range("E" & (i - 1) * 6 + 2).Value
+                    If FpopTemp(i - 1, 1) > PayloadBest Then
+                        PayloadBest = FpopTemp(i - 1, 1)
+                    End If
+                    FpopTemp(i - 1, 2) = xlWorkSheet.Range("E" & (i - 1) * 6 + 3).Value
+                    If FpopTemp(i - 1, 2) > AltitudeBest Then
+                        AltitudeBest = FpopTemp(i - 1, 2)
+                    End If
+                    FpopTemp(i - 1, 3) = xlWorkSheet.Range("E" & (i - 1) * 6 + 4).Value
+
+                Next
+
+                For k = 1 To Npop '- Nelite2
+                    Fpop(k - 1) = (1000 * (FpopTemp(k - 1, 0) / DistanceBest + FpopTemp(k - 1, 1) / PayloadBest + FpopTemp(k - 1, 2) / AltitudeBest) / 3) * FpopTemp(k - 1, 3)
+                Next
+
+                xlApp.Workbooks.Close()
+            Case False
+                For i = 1 To Npop
+                    For j = 1 To Nvar
+                        Do
+                            Xpop(i - 1, j - 1) = Rnd()
+                        Loop Until Xpop(i - 1, j - 1) > 0
+                    Next
+                Next
+
+        End Select
 
         For i = 1 To Ngen
-            Dim DistanceBest, PayloadBest, AltitudeBest As Double
-            DistanceBest = 0
-            AltitudeBest = 0
-            PayloadBest = 0
+
             For k = 1 To Npop - Nelite2
                 For j = 1 To Nvar
                     X2(j - 1) = Xpop(k - 1, j - 1) * (Xmax(j - 1) - Xmin(j - 1)) + Xmin(j - 1)
@@ -65,8 +110,8 @@ Public Class Genetic
                 FpopTemp(k - 1, 4) = Sround.Failed
 
             Next
-            ReDim Preserve FpopTemp(Npop - 1, 5)
-            For k = 1 To Npop - Nelite2
+
+            For k = 1 To Npop '- Nelite2
                 Select Case FpopTemp(k - 1, 4)
                     Case False
                         Fpop(k - 1) = (1000 * (FpopTemp(k - 1, 0) / DistanceBest + FpopTemp(k - 1, 1) / PayloadBest + FpopTemp(k - 1, 2) / AltitudeBest) / 3) * FpopTemp(k - 1, 3)
@@ -94,43 +139,54 @@ Public Class Genetic
                     End If
                 Next
             Next
-            Gbest = Fpop(Npop - 1)
+            Dim best = Fpop(Npop - 1)
 
-            Dim WorstF As Double = 1
-            ReDim XGbest(Nvar - 1)
             For j = 1 To Nvar
-                XGbest(j - 1) = Xpop(Npop - 1, j - 1) * (Xmax(j - 1) - Xmin(j - 1)) + Xmin(j - 1)
-                If j = (AirfoilIndex + 1) AndAlso AirfoilUse Then
-                    XGbest(j - 1) = Math.Floor(XGbest(j - 1))
-                End If
+                Gbest(i - 1, j - 1) = Xpop(Npop - 1, j - 1)
             Next
-            Dim Xpop2(,) As Double = Xpop
+            Fbest(i - 1, 0) = FpopTemp(Npop - 1, 0)
+            Fbest(i - 1, 1) = FpopTemp(Npop - 1, 1)
+            Fbest(i - 1, 2) = FpopTemp(Npop - 1, 2)
+            Fbest(i - 1, 3) = FpopTemp(Npop - 1, 3)
+
+            Dim Xpop2(,) As Double = Xpop.Clone()
 
             For j = 1 To Npop - Nelite
-                Dim elem = RouletteWheelSelection(Fpop)
-                If Fpop(elem.index1) < Fpop(elem.index2) Then
-                    Dim pp As Integer = elem.index1
-                    elem.index1 = elem.index2
-                    elem.index2 = pp
-                End If
-                Randomize()
+                Dim Fpop2() As Double = Fpop.Clone()
+                Dim elem = RouletteWheelSelection(Fpop2)
+                'If Fpop(elem.index1) > Fpop(elem.index2) Then
+                '    Dim pp As Integer = elem.index1
+                '    elem.index1 = elem.index2
+                '    elem.index2 = pp
+                'End If
+
                 For k = 1 To Nvar
-                    Dim a1 As Double = Unifrnd(-0.4, 1.4)
-                    Xpop2(j - 1, k - 1) = a1 * (Xpop(elem.index2, k - 1) - Xpop(elem.index1, k - 1)) + Xpop(elem.index2, k - 1)
-                    If Xpop2(j - 1, k - 1) > 1 OrElse Xpop2(j - 1, k - 1) < 0 Then
-                        Dim b As Double = Rnd()
-                        Xpop2(j - 1, k - 1) = b * Math.Abs(Xpop(elem.index1, k - 1) - Xpop(elem.index2, k - 1)) + Xpop(elem.index2, k - 1)
+                    'Dim a1 As Double = Rnd()
+                    'Xpop2(j - 1, k - 1) = a1 * (Xpop(elem.index2, k - 1) - Xpop(elem.index1, k - 1)) + Xpop(elem.index2, k - 1)
+                    'If Xpop2(j - 1, k - 1) >= 1 OrElse Xpop2(j - 1, k - 1) <= 0 Then
+                    '    Dim b As Double = Rnd()
+                    '    Xpop2(j - 1, k - 1) = b * (Xpop(elem.index2, k - 1) - Xpop(elem.index1, k - 1)) + Xpop(elem.index2, k - 1)
+                    'End If
+                    'Xpop2(j - 1, k - 1) = Math.Max(Xpop2(j - 1, k - 1), 0)
+                    'Xpop2(j - 1, k - 1) = Math.Min(Xpop2(j - 1, k - 1), 1)
+
+                    Dim c1 As Double = Math.Min(Xpop(elem.index2, k - 1), Xpop(elem.index1, k - 1))
+                    Dim c2 As Double = Math.Max(Xpop(elem.index2, k - 1), Xpop(elem.index1, k - 1))
+
+                    Dim Lbound As Double = c1 - 0.5 * (c2 - c1)
+                    Dim Ubound As Double = c2 + 0.5 * (c2 - c1)
+                    Xpop2(j - 1, k - 1) = Unifrnd(Lbound, Ubound)
+                    If Xpop2(j - 1, k - 1) >= 1 OrElse Xpop2(j - 1, k - 1) <= 0 Then
+                        Xpop2(j - 1, k - 1) = Unifrnd(c1, c2)
                     End If
-                    Xpop2(j - 1, k - 1) = Math.Max(Xpop2(j - 1, k - 1), 0)
-                    Xpop2(j - 1, k - 1) = Math.Min(Xpop2(j - 1, k - 1), 1)
                 Next
             Next
             Xpop = Xpop2
-            Randomize()
+
             For j = 1 To Npop - Nelite
                 Dim a2 As Double = Rnd()
                 If a2 <= Pmut Then
-                    Dim a1 As Integer = Math.Floor(Rnd() * (Nvar - 1)) + 1
+                    Dim a1 As Integer = Math.Floor(Rnd() * Nvar) + 1
                     Xpop(j - 1, a1 - 1) = Rnd()
                 End If
             Next
@@ -149,15 +205,21 @@ Public Class Genetic
                 End If
             Next
         Next
-        Gbest = Fpop(Npop - 1)
-    End Sub
+        For j = 1 To Nvar
+            X2(j - 1) = Xpop(Npop - 1, j - 1) * (Xmax(j - 1) - Xmin(j - 1)) + Xmin(j - 1)
+            If j = (AirfoilIndex + 1) AndAlso AirfoilUse Then
+                X2(j - 1) = Math.Floor(X2(j - 1))
+            End If
+        Next
+        Return X2
+    End Function
 
     Private Function RouletteWheelSelection(ar() As Double) As (index1 As Integer, index2 As Integer)
         Dim n As Double = 0
         Dim minimun As Double = Math.Abs(Min(ar))
-        For i = 0 To ar.GetUpperBound(0)
-            ar(i) += n + (minimun + 5)
-            n = ar(i)
+        ar(0) += (minimun + 5)
+        For i = 1 To ar.GetUpperBound(0)
+            ar(i) += ar(i - 1) + (minimun + 5)
         Next
         Dim r As Double = Unifrnd(Min(ar), Max(ar))
         Dim index1 As Integer = Array.FindIndex(ar, Function(value) value >= r)

@@ -215,28 +215,47 @@ Public Module Pilot
                 End If
 
                 WingPosX = LiftingSurface.Position.X
-                If WingPosX < (0.25 * L) Then
-                    score -= (0.25 * L - WingPosX) / (((0.75 * L - 0.15) - (0.25 * L)) * 100)
-                ElseIf WingPosX > (0.75 * L - 0.15) Then
-                    score -= (WingPosX - (0.75 * L - 0.15)) / (((0.75 * L - 0.15) - (0.25 * L)) * 100)
+                If WingPosX < (0.15 * L) Then
+                    score -= (0.15 * L - WingPosX) / (((0.85 * L - Cr) - (0.15 * L)) * 100)
+                ElseIf WingPosX > (0.85 * L - Cr) Then
+                    score -= (WingPosX - (0.85 * L - Cr)) / (((0.85 * L - Cr) - (0.15 * L)) * 100)
                 End If
 
-                'Dim phi As Double = Math.Asin((L + 0.1) / 3)
-                'Dim S As Double = 0.5 * Ct / Math.Sin(phi)
-                'If LiftingSurface.WingRegions(0).Length < 0.1 Then '0.053 IS THE RADIOUS OF THE FUSELAGE
-                '    score -= (0.1 - LiftingSurface.WingRegions(0).Length) / ((1.5 * Math.Cos(phi) - S - 0.053) - 0.1) * 100
-                'ElseIf LiftingSurface.WingRegions(0).Length > (1.5 * Math.Cos(phi) - S - 0.053) Then
-                '    score -= (LiftingSurface.WingRegions(0).Length - (1.5 * Math.Cos(phi) - S - 0.053)) / ((1.5 * Math.Cos(phi) - S - 0.053) - 0.1) * 100
-                'End If
-
-                'If LiftingSurface.WingRegions(0).Sweepback > rad2deg(Math.Atan((WingPosX - S * Math.Tan(phi)) / (-0.053 - (-LiftingSurface.WingRegions(0).Length)))) Then
-                '    score -= (LiftingSurface.WingRegions(0).Sweepback - rad2deg(Math.Atan((WingPosX - S * Math.Tan(phi)) / (-0.053 - (-LiftingSurface.WingRegions(0).Length))))) / (rad2deg(Math.Atan((WingPosX - S * Math.Tan(phi)) / (-0.053 - (-LiftingSurface.WingRegions(0).Length))))) * 100
-                'End If
-
+                'fuselage defined
                 Dim phi As Double = Math.Acos(L / 3)
-                Dim MaxSpan As Double = Math.Tan(phi) * WingPosX
+                Dim S As Double = 0.5 * Ct / Math.Tan(90 - phi)
+                Dim MaxSpan As Double
+                If WingPosX <= (L / 2) Then
+                    MaxSpan = Math.Tan(phi) * WingPosX - 0.053 - S
+                Else
+                    MaxSpan = Math.Tan(phi) * (L - WingPosX) - 0.053 - S
+                End If
+                Dim scoreWing As Double = 0
                 If LiftingSurface.WingRegions(0).Length > MaxSpan Then
-                    score -= (LiftingSurface.WingRegions(0).Length - MaxSpan) / MaxSpan * 100
+                    scoreWing = -((LiftingSurface.WingRegions(0).Length - MaxSpan) / MaxSpan * 100)
+                End If
+
+                'wing defined
+                Dim span As Double = LiftingSurface.WingRegions(0).Length + 0.053 + S
+                Dim alpha As Double = Math.Acos(span / 1.5)
+                Dim scoreFus As Double = 0
+                If span < 1.5 Then
+                    ' !!! maxL refers to HALF FUSELAGE LENGTH !!!
+                    Dim maxL As Double = Math.Tan(alpha) * span
+                    Dim FrontHalf As Double = WingPosX 'Distance the wing has from fuselage tip
+                    Dim AftHalf As Double = L - WingPosX
+
+                    If FrontHalf > maxL Then
+                        scoreFus -= (FrontHalf - maxL) / maxL * 100
+                    End If
+                    If AftHalf > maxL Then
+                        scoreFus -= (AftHalf - maxL) / maxL * 100
+                    End If
+                Else
+                    scoreFus = -1
+                End If
+                If scoreWing < 0 AndAlso scoreFus < 0 Then
+                    score -= -(scoreFus + scoreWing)
                 End If
 
             End If

@@ -4,6 +4,8 @@ Imports OpenVOGEL.DesignTools.VisualModel.Models.Components.Basics
 Imports OpenVOGEL.DesignTools.VisualModel.Models.Components
 Imports Athena.Aircraft
 Imports Athena.Aircraft.Models
+
+
 Public Class FormPilot
 
     Private Sub FormPilot_Load(sender As Object, e As EventArgs) Handles MyBase.Load
@@ -53,8 +55,9 @@ Public Class FormPilot
         Dim Gen As New Genetic.Genetic
         Me.GetSettings(Gen)
         DefineLiftingSurfaces()
-        Gen.GenAl(AddressOf Pilot.StartCalculation, CheckBox10.Checked) 'second param defines whether the optimisation is contstrained
-
+        Dim X2 = Gen.GenAl(AddressOf Pilot.StartCalculation, CheckBox10.Checked) 'second param defines whether the optimisation is contstrained
+        'SetDesignVariables(X2, MyProjectRoot.Model, aero, False)
+        MyProjectRoot.WriteToXML()
     End Sub
     Public Sub GetSettings(ByRef Gen As Genetic.Genetic)
 

@@ -274,7 +274,6 @@ Public Class Functions
     End Function
 
     Public Shared Function Unifrnd(a As Double, b As Double)
-        Randomize()
         Dim r As Double
         Dim a2 = a / 2
         Dim b2 = b / 2
